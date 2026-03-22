@@ -1,0 +1,34 @@
+{
+  "render": {
+    "workers": 4,
+    "theme": {
+      "name": "wireframe_ridge",
+      "center_y": 720,
+      "sample_count": 960,
+      "history_size": 28,
+      "line_count": 28,
+      "inner_alpha": 0.94,
+      "outer_alpha": 0.12,
+      "ridge_decay": 0.96,
+      "history_blend": 0.68,
+      "field_spread": 0.96,
+      "line_jitter": 0.028,
+      "center_line_alpha": 0.3,
+      "ridge_scale": 360,
+      "taper_power": 3.2,
+      "center_emphasis": 1.55,
+      "center_peak_width": 0.028,
+      "center_peak_gain": 0.04,
+      "propagation_shift": 8,
+      "injection_width": 6,
+      "flow_decay": 0.997,
+      "band_smooth_radius": 2,
+      "flow_smooth_radius": 3,
+      "ridge_smooth_radius": 3,
+      "edge_injection_gain": 2.4,
+      "edge_injection_power": 1.8,
+      "glow_radius": 2,
+      "glow_opacity": 0.06
+    }
+  }
+}

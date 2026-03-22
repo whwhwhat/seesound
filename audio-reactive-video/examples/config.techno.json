@@ -1,0 +1,14 @@
+{
+  "render": {
+    "workers": 4,
+    "theme": {
+      "name": "techno_minimal",
+      "background_noise": 0.02,
+      "particle_count": 12,
+      "base_radius": 0.2,
+      "glow_radius": 9,
+      "grain_strength": 0.03,
+      "spoke_count": 16
+    }
+  }
+}

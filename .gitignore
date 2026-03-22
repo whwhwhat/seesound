@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# editors
+.idea/
+.vscode/
+
+# logs
+*.log
+
+# env
+.env
+.env.*
+.venv/
+
+# python
+__pycache__/
+*.pyc
+
+# generated assets
+audio-reactive-video/.arv-output/

@@ -1,0 +1,29 @@
+{
+  "render": {
+    "workers": 4,
+    "theme": {
+      "name": "wireframe_inbound",
+      "center_y": 720,
+      "buffer_size": 640,
+      "shift_per_frame": 4,
+      "injection_width": 18,
+      "history_decay": 0.985,
+      "history_layers": 24,
+      "history_blend": 0.72,
+      "edge_injection_gain": 1.0,
+      "line_count": 18,
+      "spectrum_scale": 88,
+      "inner_alpha": 0.9,
+      "outer_alpha": 0.16,
+      "outer_amplitude_decay": 0.97,
+      "edge_taper_power": 2.8,
+      "center_focus_gain": 0.8,
+      "center_peak_power": 3.0,
+      "stack_spread": 118,
+      "stack_power": 1.7,
+      "pulse_scale": 0.02,
+      "glow_radius": 2,
+      "glow_opacity": 0.07
+    }
+  }
+}

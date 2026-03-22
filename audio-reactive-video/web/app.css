@@ -1,0 +1,247 @@
+:root {
+  --bg: #07131a;
+  --panel: rgba(8, 21, 28, 0.8);
+  --panel-border: rgba(186, 218, 230, 0.14);
+  --text: #e4f0ee;
+  --muted: #98b1b7;
+  --accent: #d2f593;
+  --accent-2: #7fefd7;
+  --shadow: rgba(0, 0, 0, 0.32);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  overflow: hidden;
+  font-family: "IBM Plex Sans", "Avenir Next", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top, rgba(110, 220, 190, 0.12), transparent 34%),
+    radial-gradient(circle at 20% 80%, rgba(225, 246, 146, 0.1), transparent 26%),
+    linear-gradient(160deg, #041015 0%, #0a171d 48%, #10131b 100%);
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) 1fr;
+  height: 100vh;
+  gap: 24px;
+  padding: 24px;
+}
+
+.control-panel,
+.viewport-panel {
+  border: 1px solid var(--panel-border);
+  border-radius: 24px;
+  background: var(--panel);
+  box-shadow: 0 20px 60px var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.control-panel {
+  padding: 24px;
+  overflow-y: auto;
+  min-height: 0;
+  height: 100%;
+}
+
+.panel-header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 0.95;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.lede,
+.notes p,
+label span,
+output {
+  color: var(--muted);
+}
+
+.control-group,
+.notes {
+  margin-top: 22px;
+}
+
+.controls-section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(186, 218, 230, 0.08);
+}
+
+.controls-section:first-of-type {
+  margin-top: 22px;
+}
+
+.section-title {
+  margin: 0 0 14px;
+  color: var(--accent);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.mode-label {
+  margin: -4px 0 2px;
+  color: var(--muted);
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+}
+
+.control-help {
+  grid-column: 1 / -1;
+  color: rgba(152, 177, 183, 0.78);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.mode-label.is-hidden {
+  display: none;
+}
+
+.file-picker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 12px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(210, 245, 147, 0.35);
+  color: var(--text);
+  background: rgba(210, 245, 147, 0.08);
+  cursor: pointer;
+}
+
+.file-picker input {
+  display: none;
+}
+
+#audio {
+  width: 100%;
+  margin-top: 14px;
+}
+
+.control-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.control-grid label {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+}
+
+.control-grid .control-toggle {
+  align-items: center;
+}
+
+.control-grid .control-toggle input[type="checkbox"] {
+  grid-column: 2;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent-2);
+}
+
+.control-grid label.is-hidden {
+  display: none;
+}
+
+.control-grid input[type="range"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--accent-2);
+}
+
+.control-grid select,
+.control-grid input[type="color"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(127, 239, 215, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font: inherit;
+}
+
+.control-grid input[type="color"] {
+  padding: 4px;
+  cursor: pointer;
+}
+
+.segmented-control {
+  grid-column: 1 / -1;
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.segmented-control button {
+  min-height: 42px;
+  border: 1px solid rgba(127, 239, 215, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.segmented-control button.is-active {
+  border-color: rgba(210, 245, 147, 0.4);
+  background: rgba(210, 245, 147, 0.12);
+  color: var(--text);
+}
+
+.viewport-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+#preview {
+  width: min(100%, calc(100vh - 60px));
+  aspect-ratio: 1;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at center, rgba(210, 245, 147, 0.02), transparent 40%),
+    #020609;
+}
+
+@media (max-width: 960px) {
+  body {
+    overflow: auto;
+  }
+
+  .app-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  #preview {
+    width: 100%;
+  }
+
+  .control-panel {
+    height: auto;
+    overflow-y: visible;
+  }
+}

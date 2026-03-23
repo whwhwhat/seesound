@@ -556,7 +556,7 @@ function ensureGpuFieldPipeline() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, fieldSize, fieldSize, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, fieldSize, fieldSize, 0, gl.RGBA, gl.FLOAT, null);
 
     const colorAccumTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, colorAccumTexture);
@@ -564,7 +564,7 @@ function ensureGpuFieldPipeline() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, fieldSize, fieldSize, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, fieldSize, fieldSize, 0, gl.RGBA, gl.FLOAT, null);
 
     const colorWeightTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, colorWeightTexture);
@@ -572,7 +572,7 @@ function ensureGpuFieldPipeline() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, fieldSize, fieldSize, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, fieldSize, fieldSize, 0, gl.RGBA, gl.FLOAT, null);
 
     const sharpAtlasTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, sharpAtlasTexture);
@@ -623,8 +623,8 @@ function ensureGpuFieldPipeline() {
       signedMode: gl.getUniformLocation(program, "u_signedMode"),
       useGlowColor: gl.getUniformLocation(program, "u_useGlowColor"),
     };
-    gpuFieldPipeline.outputInternalFormat = gl.RGBA16F;
-    gpuFieldPipeline.outputType = gl.HALF_FLOAT;
+    gpuFieldPipeline.outputInternalFormat = gl.RGBA32F;
+    gpuFieldPipeline.outputType = gl.FLOAT;
     gpuFieldPipeline.available = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
     if (gpuFieldPipeline.available) {
       console.log("GPU field pipeline ready");
@@ -903,7 +903,7 @@ function uploadFieldToGpuTextures(field, colorAccum, colorWeight) {
     rgba[idx + 3] = 1;
   }
   gl.bindTexture(gl.TEXTURE_2D, gpuFieldPipeline.outputTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, fieldSize, fieldSize, 0, gl.RGBA, gl.FLOAT, rgba);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, fieldSize, fieldSize, 0, gl.RGBA, gl.FLOAT, rgba);
 
   for (let ptr = 0; ptr < fieldCellCount; ptr += 1) {
     const idx = ptr * 4;
@@ -1863,9 +1863,14 @@ function renderField() {
   const glowColor = lerpColor(themePalette.baseColor, averageGlowColor, clamp(0.78 + separation * 0.14, 0, 1));
   let baseImageSource = fieldCanvas;
   let didShadeOnGpu = false;
-
-  if (canUseGpuFinalShade) {
-    uploadFieldToGpuTextures(field, colorAccum, colorWeight);
+  const isSignedMode = displayMode === "single" || combineMode === "signed";
+  const fieldWasModified = !isSignedMode;
+  
+  if (canUseGpuFinalShade && renderStyle === "glow") {
+    if (fieldWasModified) {
+      uploadFieldToGpuTextures(field, colorAccum, colorWeight);
+    }
+    
     didShadeOnGpu = shadeFieldOnGpu({
       rms,
       centroid,

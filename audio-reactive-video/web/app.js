@@ -334,8 +334,8 @@ void main() {
     ? 1.0 - smoothstep(0.5 - 2.5 / 384.0, 0.5 + 1.5 / 384.0, distanceToCenter)
     : max(0.0, 1.0 - radius * radius);
 
-  float edgeX = abs(value - sampleField(v_uv + vec2(u_texel.x, 0.0)));
-  float edgeY = abs(value - sampleField(v_uv + vec2(0.0, u_texel.y)));
+  float edgeX = abs(value - sampleField(v_uv + vec2(u_texel.x, 0.0)) / max(u_displayScale, 1e-6));
+  float edgeY = abs(value - sampleField(v_uv + vec2(0.0, u_texel.y)) / max(u_displayScale, 1e-6));
   float gradient = min(1.0, (edgeX + edgeY) * 2.6);
   float absValue = abs(value);
   float nodeCore = u_renderDormant > 0.5 ? 0.0 : exp(-absValue * u_coreSharpness);
@@ -884,6 +884,46 @@ function readGpuGlowAccumulation(field, colorWeight, colorAccum) {
   for (let ptr = 0; ptr < fieldCellCount; ptr += 1) {
     colorWeight[ptr] = renderBuffers.gpuFieldReadback[ptr * 4];
   }
+
+  return true;
+}
+
+function uploadFieldToGpuTextures(field, colorAccum, colorWeight) {
+  if (!gpuFieldPipeline.available) {
+    return false;
+  }
+  const gl = gpuFieldPipeline.gl;
+  const rgba = renderBuffers.gpuFieldReadback;
+
+  for (let ptr = 0; ptr < fieldCellCount; ptr += 1) {
+    const idx = ptr * 4;
+    rgba[idx] = field[ptr];
+    rgba[idx + 1] = 0;
+    rgba[idx + 2] = 0;
+    rgba[idx + 3] = 1;
+  }
+  gl.bindTexture(gl.TEXTURE_2D, gpuFieldPipeline.outputTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, fieldSize, fieldSize, 0, gl.RGBA, gl.FLOAT, rgba);
+
+  for (let ptr = 0; ptr < fieldCellCount; ptr += 1) {
+    const idx = ptr * 4;
+    rgba[idx] = colorAccum[ptr * 3];
+    rgba[idx + 1] = colorAccum[ptr * 3 + 1];
+    rgba[idx + 2] = colorAccum[ptr * 3 + 2];
+    rgba[idx + 3] = 1;
+  }
+  gl.bindTexture(gl.TEXTURE_2D, gpuFieldPipeline.colorAccumTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, fieldSize, fieldSize, 0, gl.RGBA, gl.FLOAT, rgba);
+
+  for (let ptr = 0; ptr < fieldCellCount; ptr += 1) {
+    const idx = ptr * 4;
+    rgba[idx] = colorWeight[ptr];
+    rgba[idx + 1] = 0;
+    rgba[idx + 2] = 0;
+    rgba[idx + 3] = 1;
+  }
+  gl.bindTexture(gl.TEXTURE_2D, gpuFieldPipeline.colorWeightTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, fieldSize, fieldSize, 0, gl.RGBA, gl.FLOAT, rgba);
 
   return true;
 }
@@ -1670,7 +1710,7 @@ function renderField() {
   const useGlowColor = renderStyle === "glow";
   const themePalette = getThemeGlowPalette();
   const useGpuFieldOutput = gpuFieldPipeline.available && (renderStyle === "isoline" || renderStyle === "glow");
-  const canUseGpuFinalShade = false;
+  const canUseGpuFinalShade = true;
   const renderAsDormantScene = !isPlaying && audio.currentTime <= 0.001;
   let activeSingleAmp = 0;
   let sceneColorWeight = 0;
@@ -1713,7 +1753,7 @@ function renderField() {
   }
 
   if (useGpuFieldOutput) {
-    if (useGlowColor && !canUseGpuFinalShade) {
+    if (useGlowColor) {
       readGpuGlowAccumulation(field, colorWeight, colorAccum);
     } else {
       readGpuFieldIntoCpuBuffer(field);
@@ -1730,10 +1770,10 @@ function renderField() {
       const blurredMix = modeRenderState.blurMix[index];
       const modeColor = useGlowColor
         ? [
-            modeRenderState.color[index * 3],
-            modeRenderState.color[index * 3 + 1],
-            modeRenderState.color[index * 3 + 2],
-          ]
+          modeRenderState.color[index * 3],
+          modeRenderState.color[index * 3 + 1],
+          modeRenderState.color[index * 3 + 2],
+        ]
         : null;
       for (let ptr = 0; ptr < field.length; ptr += 1) {
         const spatialValue = spatial.sharp[ptr] * sharpMix + spatial.blurred[ptr] * blurredMix;
@@ -1814,10 +1854,10 @@ function renderField() {
   const averageGlowColor =
     sceneColorWeight > 1e-6
       ? [
-          sceneColorAccum[0] / sceneColorWeight,
-          sceneColorAccum[1] / sceneColorWeight,
-          sceneColorAccum[2] / sceneColorWeight,
-        ]
+        sceneColorAccum[0] / sceneColorWeight,
+        sceneColorAccum[1] / sceneColorWeight,
+        sceneColorAccum[2] / sceneColorWeight,
+      ]
       : themePalette.baseColor;
   const separation = numericControls.colorSeparation;
   const glowColor = lerpColor(themePalette.baseColor, averageGlowColor, clamp(0.78 + separation * 0.14, 0, 1));
@@ -1825,6 +1865,7 @@ function renderField() {
   let didShadeOnGpu = false;
 
   if (canUseGpuFinalShade) {
+    uploadFieldToGpuTextures(field, colorAccum, colorWeight);
     didShadeOnGpu = shadeFieldOnGpu({
       rms,
       centroid,

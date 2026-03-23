@@ -1710,7 +1710,7 @@ function renderField() {
   const useGlowColor = renderStyle === "glow";
   const themePalette = getThemeGlowPalette();
   const useGpuFieldOutput = gpuFieldPipeline.available && (renderStyle === "isoline" || renderStyle === "glow");
-  const canUseGpuFinalShade = true;
+  const canUseGpuFinalShade = false;
   const renderAsDormantScene = !isPlaying && audio.currentTime <= 0.001;
   let activeSingleAmp = 0;
   let sceneColorWeight = 0;

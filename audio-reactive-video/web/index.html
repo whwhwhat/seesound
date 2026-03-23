@@ -49,6 +49,14 @@
               <button type="button" data-render-style="isoline">Isoline</button>
             </div>
           </label>
+          <label>
+            <span>Frame rate</span>
+            <div class="segmented-control" id="frameRateLimit">
+              <button type="button" data-frame-rate="auto" class="is-active">Auto</button>
+              <button type="button" data-frame-rate="60">60 FPS</button>
+            </div>
+            <small class="control-help">Cap animation refresh to reduce CPU/GPU load.</small>
+          </label>
           <label id="atmosphereWrap" class="control-toggle">
             <span>Atmosphere background</span>
             <input id="atmosphereEnabled" type="checkbox" checked />

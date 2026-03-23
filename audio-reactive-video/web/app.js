@@ -9,6 +9,8 @@ const plateShapeButtons = Array.from(plateShapeRoot.querySelectorAll("button[dat
 const angularRotationWrap = document.getElementById("angularRotationWrap");
 const renderStyleRoot = document.getElementById("renderStyle");
 const renderStyleButtons = Array.from(renderStyleRoot.querySelectorAll("button[data-render-style]"));
+const frameRateLimitRoot = document.getElementById("frameRateLimit");
+const frameRateLimitButtons = Array.from(frameRateLimitRoot.querySelectorAll("button[data-frame-rate]"));
 const atmosphereWrap = document.getElementById("atmosphereWrap");
 const atmosphereEnabledInput = document.getElementById("atmosphereEnabled");
 const glowThicknessWrap = document.getElementById("glowThicknessWrap");
@@ -426,11 +428,13 @@ let modeState = [];
 let bandProfile = new Float32Array();
 let animationFrame = 0;
 let isAnimating = false;
+let lastAnimationTimestamp = 0;
 let phase = 0;
 let renderStyle = "glow";
 let displayMode = "sum";
 let combineMode = "signed";
 let singleModeView = "amplitude";
+let frameRateLimit = "auto";
 let plateShape = "square";
 let activeTheme = "lab";
 let lowBandColor = [...THEME_PRESETS.lab.low];
@@ -484,6 +488,7 @@ const profiler = {
     readProfilePreference(),
   overlay: null,
   frameCount: 0,
+  fps: 0,
   samples: Object.create(null),
   order: [
     "frame",
@@ -532,6 +537,7 @@ function ensureProfilerOverlay() {
 
 function resetProfilerSamples() {
   profiler.frameCount = 0;
+  profiler.fps = 0;
   profiler.samples = Object.create(null);
   if (profiler.overlay) {
     profiler.overlay.textContent = "Profiling...";
@@ -589,11 +595,20 @@ function finishFrameProfile(frameProfile) {
     const previous = profiler.samples[name] ?? value;
     profiler.samples[name] = previous * 0.84 + value * 0.16;
   }
+  const instantaneousFps = 1000 / Math.max(frameProfile.sections.frame, 1e-6);
+  profiler.fps = profiler.fps === 0
+    ? instantaneousFps
+    : profiler.fps * 0.84 + instantaneousFps * 0.16;
   profiler.frameCount += 1;
   if (!profiler.overlay || profiler.frameCount % 12 !== 0) {
     return;
   }
-  const lines = [`profile avg (${profiler.frameCount}f)`];
+  const lines = [
+    `profile avg (${profiler.frameCount}f)`,
+    `mode`.padEnd(15) + ` ${rendererFlags.directGpuPresentation ? "direct-gpu" : "stable"}`,
+    `limit`.padEnd(15) + ` ${frameRateLimit === "auto" ? "auto" : "60 fps"}`,
+    `fps`.padEnd(15) + ` ${profiler.fps.toFixed(1)}`,
+  ];
   for (const name of profiler.order) {
     lines.push(`${name.padEnd(15)} ${profiler.samples[name].toFixed(2)} ms`);
   }
@@ -2480,6 +2495,13 @@ function tick() {
     animationFrame = 0;
     return;
   }
+  const targetFrameMs = frameRateLimit === "60" ? 1000 / 60 : 0;
+  const now = performance.now();
+  if (targetFrameMs > 0 && lastAnimationTimestamp > 0 && now - lastAnimationTimestamp < targetFrameMs) {
+    animationFrame = window.requestAnimationFrame(tick);
+    return;
+  }
+  lastAnimationTimestamp = now;
   renderField();
   animationFrame = window.requestAnimationFrame(tick);
 }
@@ -2493,11 +2515,13 @@ function startAnimationLoop() {
     window.cancelAnimationFrame(animationFrame);
     animationFrame = 0;
   }
+  lastAnimationTimestamp = 0;
   animationFrame = window.requestAnimationFrame(tick);
 }
 
 function stopAnimationLoop() {
   isAnimating = false;
+  lastAnimationTimestamp = 0;
   if (animationFrame) {
     window.cancelAnimationFrame(animationFrame);
     animationFrame = 0;
@@ -2545,6 +2569,21 @@ renderStyleButtons.forEach((button) => {
       renderStyle === "isoline"
         ? "Showing extracted zero-contours."
         : "Showing glow-based nodal rendering.";
+    requestRender();
+  });
+});
+
+frameRateLimitButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    frameRateLimit = button.dataset.frameRate === "60" ? "60" : "auto";
+    frameRateLimitButtons.forEach((item) => {
+      item.classList.toggle("is-active", item === button);
+    });
+    lastAnimationTimestamp = 0;
+    statusNode.textContent =
+      frameRateLimit === "60"
+        ? "Frame rate capped at 60 FPS."
+        : "Frame rate cap disabled.";
     requestRender();
   });
 });

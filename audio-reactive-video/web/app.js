@@ -1,5 +1,6 @@
 const canvas = document.getElementById("preview");
 const ctx = canvas.getContext("2d");
+const glCanvas = document.getElementById("previewGl");
 const audio = document.getElementById("audio");
 const fileInput = document.getElementById("audioFile");
 const statusNode = document.getElementById("status");
@@ -121,9 +122,19 @@ fieldCanvas.width = fieldSize;
 fieldCanvas.height = fieldSize;
 const fieldCtx = fieldCanvas.getContext("2d");
 const fieldImage = fieldCtx.createImageData(fieldSize, fieldSize);
-const gpuFieldCanvas = document.createElement("canvas");
-gpuFieldCanvas.width = fieldSize;
-gpuFieldCanvas.height = fieldSize;
+const directGpuUnderlayCanvas = document.createElement("canvas");
+directGpuUnderlayCanvas.width = fieldSize;
+directGpuUnderlayCanvas.height = fieldSize;
+const directGpuUnderlayCtx = directGpuUnderlayCanvas.getContext("2d");
+const directGpuUnderlayImage = directGpuUnderlayCtx.createImageData(fieldSize, fieldSize);
+const plateUnderlayCanvases = {
+  square: document.createElement("canvas"),
+  circle: document.createElement("canvas"),
+};
+plateUnderlayCanvases.square.width = fieldSize;
+plateUnderlayCanvases.square.height = fieldSize;
+plateUnderlayCanvases.circle.width = fieldSize;
+plateUnderlayCanvases.circle.height = fieldSize;
 const glowCanvas = document.createElement("canvas");
 glowCanvas.width = 2048;
 glowCanvas.height = 2048;
@@ -307,12 +318,15 @@ uniform float u_shapeMode;
 uniform float u_useGlowColor;
 uniform float u_glowThickness;
 uniform float u_glowSpread;
+uniform float u_atmosphereEnabled;
 uniform vec3 u_baseBgColor;
 uniform vec3 u_backdropColor;
 uniform vec3 u_baseColor;
 uniform vec3 u_lineColor;
 uniform vec3 u_outerColor;
 uniform vec3 u_glowColor;
+uniform vec3 u_atmosphereCore;
+uniform vec3 u_atmosphereOuter;
 
 in vec2 v_uv;
 out vec4 outColor;
@@ -338,25 +352,40 @@ void main() {
   float edgeY = abs(value - sampleField(v_uv + vec2(0.0, u_texel.y)) / max(u_displayScale, 1e-6));
   float gradient = min(1.0, (edgeX + edgeY) * 2.6);
   float absValue = abs(value);
-  float nodeCore = u_renderDormant > 0.5 ? 0.0 : exp(-absValue * u_coreSharpness);
-  float nodeHalo = u_renderDormant > 0.5 ? 0.0 : exp(-absValue * u_haloSharpness);
+  float thicknessNorm = clamp(u_glowThickness / 4.0, 0.1, 2.4);
+  float spreadNorm = clamp(u_glowSpread / 2.5, 0.08, 4.0);
+  float nodeCore = u_renderDormant > 0.5 ? 0.0 : exp(-absValue * (u_coreSharpness / thicknessNorm));
+  float nodeHalo = u_renderDormant > 0.5 ? 0.0 : exp(-absValue * (u_haloSharpness / max(0.35, spreadNorm)));
+  float outerHalo = u_renderDormant > 0.5 ? 0.0 : exp(-absValue * (u_haloSharpness / max(0.22, spreadNorm * 1.45)));
   float lineStrength = nodeCore * (u_lineWeight + gradient * 1.25) * u_singleAmpGate;
   float haloStrength = nodeHalo * (u_haloWeight + gradient * 0.22) * u_singleAmpGate;
+  float glowStrength = outerHalo * (0.06 + spreadNorm * 0.025 + u_singleAmpGate * 0.05);
   float displacement = pow(min(1.0, absValue), u_contrast);
   float backgroundField = displacement * u_backgroundWeight * u_singleAmpGate;
-  float brightness = min(1.0, (lineStrength + haloStrength + backgroundField) * mask);
+  float brightness = min(1.0, (lineStrength + haloStrength + glowStrength + backgroundField) * mask);
   float warm = min(1.0, brightness * (0.7 + u_centroid * 0.55));
-  float cool = min(1.0, (gradient * 0.28 + u_rms * 0.18 + nodeHalo * 0.12) * mask);
+  float cool = min(1.0, (gradient * 0.28 + u_rms * 0.18 + nodeHalo * 0.12 + outerHalo * 0.03) * mask);
   float dither = texture(u_ditherTex, v_uv).r;
   float warmD = clamp01(warm + dither * 0.7);
   float brightD = clamp01(brightness + dither);
   float coolD = clamp01(cool + dither * 0.55);
+  float atmosphereMix =
+    u_atmosphereEnabled > 0.5
+      ? (1.0 - smoothstep(0.06, 0.48, distanceToCenter)) * (0.14 + brightness * 0.1)
+      : 0.0;
+  float atmosphereEdge =
+    u_atmosphereEnabled > 0.5
+      ? (1.0 - smoothstep(0.18, 0.52, distanceToCenter)) * 0.08
+      : 0.0;
 
   vec3 color = vec3(
     u_baseBgColor.r + warmD * u_backdropColor.r * 0.82 + brightD * u_baseColor.r * 0.12,
     u_baseBgColor.g + brightD * u_backdropColor.g * 0.84 + lineStrength * u_lineColor.g * 0.12,
     u_baseBgColor.b + coolD * u_backdropColor.b * 0.92 + lineStrength * u_lineColor.b * 0.1
   );
+  color += u_atmosphereCore * atmosphereMix + u_atmosphereOuter * atmosphereEdge;
+  color += u_outerColor * glowStrength * 0.14;
+  color += u_glowColor * glowStrength * (0.08 + spreadNorm * 0.015);
 
   if (u_useGlowColor > 0.5) {
     vec3 accum = texture(u_colorAccumTex, v_uv).rgb;
@@ -384,7 +413,7 @@ void main() {
     }
   }
 
-  outColor = vec4(color / 255.0, mask);
+  outColor = vec4(clamp(color / 255.0, 0.0, 1.0), mask);
 }
 `;
 
@@ -407,8 +436,221 @@ let activeTheme = "lab";
 let lowBandColor = [...THEME_PRESETS.lab.low];
 let midBandColor = [...THEME_PRESETS.lab.mid];
 let highBandColor = [...THEME_PRESETS.lab.high];
-
 const spatialCache = new Map();
+
+function readProfilePreference() {
+  try {
+    return window.localStorage.getItem("arv_profile") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeProfilePreference(enabled) {
+  try {
+    window.localStorage.setItem("arv_profile", enabled ? "1" : "0");
+  } catch {
+    // Ignore storage failures in restricted contexts.
+  }
+}
+
+function readDirectGpuPreference() {
+  try {
+    return window.localStorage.getItem("arv_direct_gpu") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeDirectGpuPreference(enabled) {
+  try {
+    window.localStorage.setItem("arv_direct_gpu", enabled ? "1" : "0");
+  } catch {
+    // Ignore storage failures in restricted contexts.
+  }
+}
+
+const rendererFlags = {
+  directGpuPresentation:
+    new URLSearchParams(window.location.search).get("directGpu") === "1" ||
+    window.location.hash.includes("direct-gpu") ||
+    readDirectGpuPreference(),
+};
+
+const profiler = {
+  enabled:
+    new URLSearchParams(window.location.search).get("profile") === "1" ||
+    window.location.hash.includes("profile") ||
+    readProfilePreference(),
+  overlay: null,
+  frameCount: 0,
+  samples: Object.create(null),
+  order: [
+    "frame",
+    "updateModeState",
+    "gpuAccumulate",
+    "gpuShade",
+    "gpuReadback",
+    "cpuAccumulate",
+    "fieldPost",
+    "cpuShade",
+    "isoline",
+    "glowContours",
+    "composite",
+  ],
+};
+
+function ensureProfilerOverlay() {
+  if (!profiler.enabled) {
+    if (profiler.overlay) {
+      profiler.overlay.remove();
+      profiler.overlay = null;
+    }
+    return;
+  }
+  if (profiler.overlay) {
+    return;
+  }
+  const overlay = document.createElement("pre");
+  overlay.style.position = "fixed";
+  overlay.style.right = "16px";
+  overlay.style.bottom = "16px";
+  overlay.style.margin = "0";
+  overlay.style.padding = "10px 12px";
+  overlay.style.borderRadius = "12px";
+  overlay.style.background = "rgba(4, 10, 14, 0.86)";
+  overlay.style.border = "1px solid rgba(186, 218, 230, 0.18)";
+  overlay.style.color = "#d7ece7";
+  overlay.style.font = '12px/1.45 "IBM Plex Mono", monospace';
+  overlay.style.whiteSpace = "pre";
+  overlay.style.pointerEvents = "none";
+  overlay.style.zIndex = "9999";
+  overlay.textContent = "Profiling...";
+  document.body.appendChild(overlay);
+  profiler.overlay = overlay;
+}
+
+function resetProfilerSamples() {
+  profiler.frameCount = 0;
+  profiler.samples = Object.create(null);
+  if (profiler.overlay) {
+    profiler.overlay.textContent = "Profiling...";
+  }
+}
+
+function setProfilerEnabled(enabled) {
+  profiler.enabled = enabled;
+  writeProfilePreference(enabled);
+  if (!enabled) {
+    ensureProfilerOverlay();
+    return;
+  }
+  resetProfilerSamples();
+  ensureProfilerOverlay();
+  requestRender();
+}
+
+function setDirectGpuPresentationEnabled(enabled) {
+  rendererFlags.directGpuPresentation = enabled;
+  writeDirectGpuPreference(enabled);
+  clearGpuPresentation();
+  requestRender();
+}
+
+function beginFrameProfile() {
+  if (!profiler.enabled) {
+    return null;
+  }
+  ensureProfilerOverlay();
+  return {
+    start: performance.now(),
+    sections: Object.create(null),
+  };
+}
+
+function profileSectionStart(frameProfile) {
+  return frameProfile ? performance.now() : 0;
+}
+
+function profileSectionEnd(frameProfile, name, startTime) {
+  if (!frameProfile) {
+    return;
+  }
+  frameProfile.sections[name] = (frameProfile.sections[name] || 0) + (performance.now() - startTime);
+}
+
+function finishFrameProfile(frameProfile) {
+  if (!frameProfile) {
+    return;
+  }
+  frameProfile.sections.frame = performance.now() - frameProfile.start;
+  for (const name of profiler.order) {
+    const value = frameProfile.sections[name] || 0;
+    const previous = profiler.samples[name] ?? value;
+    profiler.samples[name] = previous * 0.84 + value * 0.16;
+  }
+  profiler.frameCount += 1;
+  if (!profiler.overlay || profiler.frameCount % 12 !== 0) {
+    return;
+  }
+  const lines = [`profile avg (${profiler.frameCount}f)`];
+  for (const name of profiler.order) {
+    lines.push(`${name.padEnd(15)} ${profiler.samples[name].toFixed(2)} ms`);
+  }
+  profiler.overlay.textContent = lines.join("\n");
+}
+
+function setGpuCanvasVisible(visible, rotateCircleSigned = false) {
+  glCanvas.classList.toggle("is-visible", visible);
+  glCanvas.style.transform = rotateCircleSigned ? "rotate(-90deg)" : "";
+}
+
+function setGpuCanvasFrame(active) {
+  if (!active) {
+    glCanvas.style.left = "0";
+    glCanvas.style.top = "0";
+    glCanvas.style.width = "100%";
+    glCanvas.style.height = "100%";
+    return;
+  }
+  const stageSize = canvas.clientWidth || glCanvas.parentElement?.clientWidth || 0;
+  const inset = stageSize * 0.09;
+  const drawSize = stageSize - inset * 2;
+  glCanvas.style.left = `${inset}px`;
+  glCanvas.style.top = `${inset}px`;
+  glCanvas.style.width = `${drawSize}px`;
+  glCanvas.style.height = `${drawSize}px`;
+}
+
+function setGpuCanvasPresentation(active, options = {}) {
+  if (!active) {
+    glCanvas.style.opacity = "";
+    glCanvas.style.filter = "";
+    glCanvas.style.boxShadow = "";
+    return;
+  }
+  const opacity = options.opacity ?? 0.18;
+  const blur = options.blurPx ?? 0;
+  const shadowAlpha = options.shadowAlpha ?? 0.08;
+  glCanvas.style.opacity = String(opacity);
+  glCanvas.style.filter = blur > 0 ? `blur(${blur.toFixed(2)}px)` : "none";
+  glCanvas.style.boxShadow = `0 0 18px rgba(0, 0, 0, ${shadowAlpha})`;
+}
+
+function clearGpuPresentation() {
+  setGpuCanvasVisible(false, false);
+  setGpuCanvasFrame(false);
+  setGpuCanvasPresentation(false);
+  const gl = gpuFieldPipeline.gl;
+  if (!gl) {
+    return;
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, glCanvas.width, glCanvas.height);
+  gl.disable(gl.BLEND);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+}
 
 function initializeFieldGeometry() {
   let ptr = 0;
@@ -431,6 +673,55 @@ function initializeFieldGeometry() {
       ptr += 1;
     }
   }
+}
+
+function rebuildPlateUnderlayCanvases() {
+  for (const shape of ["square", "circle"]) {
+    const underlayCanvas = plateUnderlayCanvases[shape];
+    const underlayCtx = underlayCanvas.getContext("2d");
+    const image = underlayCtx.createImageData(fieldSize, fieldSize);
+    const imageData = image.data;
+    const mask = shape === "circle" ? fieldGeometry.circleMask : fieldGeometry.squareMask;
+    for (let ptr = 0; ptr < mask.length; ptr += 1) {
+      const alpha = Math.round(clamp(mask[ptr], 0, 1) * 255);
+      imageData[ptr * 4] = BASE_BG_COLOR[0];
+      imageData[ptr * 4 + 1] = BASE_BG_COLOR[1];
+      imageData[ptr * 4 + 2] = BASE_BG_COLOR[2];
+      imageData[ptr * 4 + 3] = alpha;
+    }
+    underlayCtx.putImageData(image, 0, 0);
+  }
+}
+
+function updateDirectGpuUnderlay(field, displayScale, params) {
+  const imageData = directGpuUnderlayImage.data;
+  const shapeMask = params.plateShape === "circle" ? fieldGeometry.circleMask : fieldGeometry.squareMask;
+  const spreadNorm = clamp(params.glowSpread / 2.5, 0.08, 4.0);
+  let ptr = 0;
+  for (let y = 0; y < fieldSize; y += 1) {
+    for (let x = 0; x < fieldSize; x += 1) {
+      const mask = shapeMask[ptr];
+      const value = field[ptr] / Math.max(displayScale, 1e-6);
+      const edgeX = x < fieldSize - 1 ? Math.abs(field[ptr] - field[ptr + 1]) / Math.max(displayScale, 1e-6) : 0;
+      const edgeY = y < fieldSize - 1 ? Math.abs(field[ptr] - field[ptr + fieldSize]) / Math.max(displayScale, 1e-6) : 0;
+      const gradient = Math.min(1, (edgeX + edgeY) * 2.6);
+      const absValue = Math.abs(value);
+      const nodeHalo = params.renderAsDormantField ? 0 : Math.exp(-absValue * (params.haloSharpness / Math.max(0.35, spreadNorm)));
+      const outerHalo = params.renderAsDormantField ? 0 : Math.exp(-absValue * (params.haloSharpness / Math.max(0.22, spreadNorm * 1.45)));
+      const displacement = Math.pow(Math.min(1, absValue), params.contrast);
+      const backgroundField = displacement * params.backgroundWeight * params.singleAmpGate;
+      const underlayStrength = Math.min(
+        1,
+        (backgroundField * 1.45 + nodeHalo * 0.18 + outerHalo * 0.1 + gradient * 0.06) * mask,
+      );
+      imageData[ptr * 4] = Math.round(BASE_BG_COLOR[0] + underlayStrength * params.themePalette.backdropColor[0] * 0.38);
+      imageData[ptr * 4 + 1] = Math.round(BASE_BG_COLOR[1] + underlayStrength * params.themePalette.backdropColor[1] * 0.4);
+      imageData[ptr * 4 + 2] = Math.round(BASE_BG_COLOR[2] + underlayStrength * params.themePalette.backdropColor[2] * 0.46);
+      imageData[ptr * 4 + 3] = Math.round(clamp(mask, 0, 1) * 255);
+      ptr += 1;
+    }
+  }
+  directGpuUnderlayCtx.putImageData(directGpuUnderlayImage, 0, 0);
 }
 
 function getBandRanges(groups, sampleRate) {
@@ -515,7 +806,7 @@ function ensureGpuFieldPipeline() {
     return false;
   }
 
-  const gl = gpuFieldCanvas.getContext("webgl2", {
+  const gl = glCanvas.getContext("webgl2", {
     alpha: false,
     antialias: false,
     depth: false,
@@ -698,12 +989,15 @@ function ensureGpuShadePipeline() {
       useGlowColor: gl.getUniformLocation(program, "u_useGlowColor"),
       glowThickness: gl.getUniformLocation(program, "u_glowThickness"),
       glowSpread: gl.getUniformLocation(program, "u_glowSpread"),
+      atmosphereEnabled: gl.getUniformLocation(program, "u_atmosphereEnabled"),
       baseBgColor: gl.getUniformLocation(program, "u_baseBgColor"),
       backdropColor: gl.getUniformLocation(program, "u_backdropColor"),
       baseColor: gl.getUniformLocation(program, "u_baseColor"),
       lineColor: gl.getUniformLocation(program, "u_lineColor"),
       outerColor: gl.getUniformLocation(program, "u_outerColor"),
       glowColor: gl.getUniformLocation(program, "u_glowColor"),
+      atmosphereCore: gl.getUniformLocation(program, "u_atmosphereCore"),
+      atmosphereOuter: gl.getUniformLocation(program, "u_atmosphereOuter"),
     };
     gpuShadePipeline.available = true;
     return true;
@@ -935,7 +1229,7 @@ function shadeFieldOnGpu(params) {
 
   const gl = gpuFieldPipeline.gl;
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.viewport(0, 0, fieldSize, fieldSize);
+  gl.viewport(0, 0, glCanvas.width, glCanvas.height);
   gl.useProgram(gpuShadePipeline.program);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, gpuShadePipeline.positionBuffer);
@@ -975,12 +1269,15 @@ function shadeFieldOnGpu(params) {
   gl.uniform1f(gpuShadePipeline.uniforms.useGlowColor, params.useGlowColor ? 1 : 0);
   gl.uniform1f(gpuShadePipeline.uniforms.glowThickness, params.glowThickness);
   gl.uniform1f(gpuShadePipeline.uniforms.glowSpread, params.glowSpread);
+  gl.uniform1f(gpuShadePipeline.uniforms.atmosphereEnabled, params.atmosphereEnabled ? 1 : 0);
   gl.uniform3f(gpuShadePipeline.uniforms.baseBgColor, BASE_BG_COLOR[0], BASE_BG_COLOR[1], BASE_BG_COLOR[2]);
   gl.uniform3f(gpuShadePipeline.uniforms.backdropColor, params.themePalette.backdropColor[0], params.themePalette.backdropColor[1], params.themePalette.backdropColor[2]);
   gl.uniform3f(gpuShadePipeline.uniforms.baseColor, params.themePalette.baseColor[0], params.themePalette.baseColor[1], params.themePalette.baseColor[2]);
   gl.uniform3f(gpuShadePipeline.uniforms.lineColor, params.themePalette.lineColor[0], params.themePalette.lineColor[1], params.themePalette.lineColor[2]);
   gl.uniform3f(gpuShadePipeline.uniforms.outerColor, params.themePalette.outerColor[0], params.themePalette.outerColor[1], params.themePalette.outerColor[2]);
   gl.uniform3f(gpuShadePipeline.uniforms.glowColor, params.glowColor[0], params.glowColor[1], params.glowColor[2]);
+  gl.uniform3f(gpuShadePipeline.uniforms.atmosphereCore, params.themePalette.atmosphereCore[0], params.themePalette.atmosphereCore[1], params.themePalette.atmosphereCore[2]);
+  gl.uniform3f(gpuShadePipeline.uniforms.atmosphereOuter, params.themePalette.atmosphereOuter[0], params.themePalette.atmosphereOuter[1], params.themePalette.atmosphereOuter[2]);
 
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   return true;
@@ -1235,6 +1532,17 @@ function lerp(a, b, t) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function traceRoundedRect(ctx, x, y, width, height, radius) {
+  const r = Math.max(0, Math.min(radius, width * 0.5, height * 0.5));
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
 }
 
 function smoothstep(edge0, edge1, x) {
@@ -1690,13 +1998,16 @@ function updateModeState() {
 }
 
 function renderField() {
+  const frameProfile = beginFrameProfile();
   gpuFieldValidation.frame += 1;
   const coupling = numericControls.coupling;
   const persistence = numericControls.persistence;
   const nodalFocus = numericControls.nodalFocus;
   const contrast = numericControls.contrast;
   const motion = numericControls.motion;
+  let profileStart = profileSectionStart(frameProfile);
   const { bands, rms, centroid, isPlaying } = updateModeState();
+  profileSectionEnd(frameProfile, "updateModeState", profileStart);
   const sampleRate = audioContext?.sampleRate ?? 48000;
   const data = fieldImage.data;
   const field = renderBuffers.field;
@@ -1707,12 +2018,15 @@ function renderField() {
   contourPathCache.path = null;
   const singleModeIndex = Math.max(0, Math.min(modeState.length - 1, Math.round(numericControls.singleModeIndex) - 1));
   const isSingleMode = displayMode === "single";
+  const isSignedMode = isSingleMode || combineMode === "signed";
   const useGlowColor = renderStyle === "glow";
   const themePalette = getThemeGlowPalette();
-  const useGpuFieldOutput = gpuFieldPipeline.available && (renderStyle === "isoline" || renderStyle === "glow");
-  const canUseGpuFinalShade = false;
+  const shouldAttemptGpuField = renderStyle === "isoline" || renderStyle === "glow";
+  const wantsDirectGpuPresentation = rendererFlags.directGpuPresentation && renderStyle === "glow" && isSignedMode;
   const renderAsDormantScene = !isPlaying && audio.currentTime <= 0.001;
   let activeSingleAmp = 0;
+  let contributionAbsSum = 0;
+  let contributionEnergy = 0;
   let sceneColorWeight = 0;
   const sceneColorAccum = [0, 0, 0];
 
@@ -1735,16 +2049,23 @@ function renderField() {
 
   const spatialAtlas = ensureSpatialAtlas();
   const modeRenderState = buildModeRenderState(sampleRate, themePalette, singleModeIndex, isSingleMode);
-  runGpuFieldAccumulation(spatialAtlas, modeRenderState, isSingleMode, useGlowColor);
+  profileStart = profileSectionStart(frameProfile);
+  const didAccumulateOnGpu = shouldAttemptGpuField
+    ? runGpuFieldAccumulation(spatialAtlas, modeRenderState, isSingleMode, useGlowColor)
+    : false;
+  profileSectionEnd(frameProfile, "gpuAccumulate", profileStart);
 
   for (let index = 0; index < modeState.length; index += 1) {
     if (modeRenderState.enabled[index] === 0) {
       continue;
     }
     const modeContribution = modeRenderState.contribution[index];
-    activeSingleAmp = Math.max(activeSingleAmp, Math.abs(modeContribution));
+    const modeMagnitude = Math.abs(modeContribution);
+    activeSingleAmp = Math.max(activeSingleAmp, modeMagnitude);
+    contributionAbsSum += modeMagnitude;
+    contributionEnergy += modeContribution * modeContribution;
     if (useGlowColor) {
-      const sceneWeight = Math.abs(modeContribution);
+      const sceneWeight = modeMagnitude;
       sceneColorWeight += sceneWeight;
       sceneColorAccum[0] += modeRenderState.color[index * 3] * sceneWeight;
       sceneColorAccum[1] += modeRenderState.color[index * 3 + 1] * sceneWeight;
@@ -1752,13 +2073,20 @@ function renderField() {
     }
   }
 
-  if (useGpuFieldOutput) {
+  let hasCpuFieldData = false;
+  let hasCpuGlowAccumulation = false;
+  if (didAccumulateOnGpu && !wantsDirectGpuPresentation) {
+    profileStart = profileSectionStart(frameProfile);
     if (useGlowColor) {
       readGpuGlowAccumulation(field, colorWeight, colorAccum);
+      hasCpuGlowAccumulation = true;
     } else {
       readGpuFieldIntoCpuBuffer(field);
     }
-  } else {
+    profileSectionEnd(frameProfile, "gpuReadback", profileStart);
+    hasCpuFieldData = true;
+  } else if (!didAccumulateOnGpu) {
+    profileStart = profileSectionStart(frameProfile);
     for (let index = 0; index < modeState.length; index += 1) {
       const mode = modeState[index];
       const spatial = getSpatialMode(mode.m, mode.n);
@@ -1792,13 +2120,19 @@ function renderField() {
         }
       }
     }
+    profileSectionEnd(frameProfile, "cpuAccumulate", profileStart);
+    hasCpuFieldData = true;
+    hasCpuGlowAccumulation = useGlowColor;
   }
 
-  if (!useGpuFieldOutput && shouldValidateGpuField()) {
+  if (!didAccumulateOnGpu && shouldValidateGpuField()) {
     validateGpuFieldAgainstCpu(field);
   }
 
-  if (displayMode !== "single" && combineMode !== "signed") {
+  if (hasCpuFieldData) {
+    profileStart = profileSectionStart(frameProfile);
+  }
+  if (hasCpuFieldData && displayMode !== "single" && combineMode !== "signed") {
     if (combineMode === "residual") {
       if (plateShape === "circle") {
         removeRadialAverage(field);
@@ -1823,17 +2157,14 @@ function renderField() {
       }
     }
   }
-
-  let maxAbs = 1e-6;
-  for (let ptr = 0; ptr < field.length; ptr += 1) {
-    maxAbs = Math.max(maxAbs, Math.abs(field[ptr]));
+  if (hasCpuFieldData) {
+    profileSectionEnd(frameProfile, "fieldPost", profileStart);
   }
 
   const singleAmpGate = isSingleMode ? Math.min(1, activeSingleAmp * 1.6) : 1;
   const singleAmpFloor = isSingleMode ? 0.0015 : 0;
   const renderAsDormantSingle = isSingleMode && activeSingleAmp < singleAmpFloor;
   const renderAsDormantField = renderAsDormantScene || renderAsDormantSingle;
-  const displayScale = isSingleMode ? 1 : maxAbs;
   const singleFocus = isSingleMode ? Math.max(0, Math.min(1, singleAmpGate)) : 1;
   const coreSharpness = isSingleMode
     ? (3 + singleFocus * 27) * nodalFocus
@@ -1862,40 +2193,83 @@ function renderField() {
   const separation = numericControls.colorSeparation;
   const glowColor = lerpColor(themePalette.baseColor, averageGlowColor, clamp(0.78 + separation * 0.14, 0, 1));
   let baseImageSource = fieldCanvas;
-  let didShadeOnGpu = false;
-  const isSignedMode = displayMode === "single" || combineMode === "signed";
-  const fieldWasModified = !isSignedMode;
-  
-  if (canUseGpuFinalShade && renderStyle === "glow") {
-    if (fieldWasModified) {
-      uploadFieldToGpuTextures(field, colorAccum, colorWeight);
+  let useDirectGpuPresentation = false;
+  let displayScale = isSingleMode ? 1 : 1;
+  if (wantsDirectGpuPresentation && didAccumulateOnGpu) {
+    profileStart = profileSectionStart(frameProfile);
+    const readFieldOk = readGpuFieldIntoCpuBuffer(field);
+    profileSectionEnd(frameProfile, "gpuReadback", profileStart);
+    if (readFieldOk) {
+      hasCpuFieldData = true;
+      let maxAbs = 1e-6;
+      for (let ptr = 0; ptr < field.length; ptr += 1) {
+        maxAbs = Math.max(maxAbs, Math.abs(field[ptr]));
+      }
+      const gpuDisplayScale = isSingleMode ? 1 : maxAbs;
+      displayScale = gpuDisplayScale;
+      updateDirectGpuUnderlay(field, gpuDisplayScale, {
+        plateShape,
+        glowSpread: numericControls.glowSpread,
+        contrast,
+        haloSharpness,
+        backgroundWeight,
+        singleAmpGate,
+        renderAsDormantField,
+        themePalette,
+      });
+      profileStart = profileSectionStart(frameProfile);
+      useDirectGpuPresentation = shadeFieldOnGpu({
+        rms,
+        centroid,
+        displayScale: Math.max(1e-6, gpuDisplayScale),
+        contrast,
+        coreSharpness,
+        haloSharpness,
+        lineWeight,
+        haloWeight,
+        backgroundWeight,
+        singleAmpGate,
+        separation,
+        renderAsDormantSingle: renderAsDormantField,
+        useGlowColor,
+        glowThickness: numericControls.glowThickness,
+        glowSpread: numericControls.glowSpread,
+        glowColor,
+        atmosphereEnabled: false,
+        themePalette,
+      });
+      profileSectionEnd(frameProfile, "gpuShade", profileStart);
+      if (useDirectGpuPresentation) {
+        const glowBlur = 0.45 + singleModeBlur * 0.6;
+        setGpuCanvasFrame(true);
+        setGpuCanvasPresentation(true, {
+          opacity: 0.14,
+          blurPx: glowBlur,
+          shadowAlpha: 0.08,
+        });
+        setGpuCanvasVisible(true, plateShape === "circle" && combineMode === "signed");
+      }
     }
-    
-    didShadeOnGpu = shadeFieldOnGpu({
-      rms,
-      centroid,
-      displayScale,
-      contrast,
-      coreSharpness,
-      haloSharpness,
-      lineWeight,
-      haloWeight,
-      backgroundWeight,
-      singleAmpGate,
-      separation,
-      renderAsDormantSingle: renderAsDormantField,
-      useGlowColor,
-      glowThickness: numericControls.glowThickness,
-      glowSpread: numericControls.glowSpread,
-      glowColor,
-      themePalette,
-    });
-    if (didShadeOnGpu) {
-      baseImageSource = gpuFieldCanvas;
+    if (!useDirectGpuPresentation) {
+      profileStart = profileSectionStart(frameProfile);
+      readGpuGlowAccumulation(field, colorWeight, colorAccum);
+      profileSectionEnd(frameProfile, "gpuReadback", profileStart);
+      hasCpuFieldData = true;
+      hasCpuGlowAccumulation = true;
     }
   }
 
-  if (!didShadeOnGpu) {
+  if (!useDirectGpuPresentation) {
+    clearGpuPresentation();
+    let maxAbs = 1e-6;
+    for (let ptr = 0; ptr < field.length; ptr += 1) {
+      maxAbs = Math.max(maxAbs, Math.abs(field[ptr]));
+    }
+    displayScale = isSingleMode ? 1 : maxAbs;
+  }
+
+  if (!useDirectGpuPresentation) {
+    profileStart = profileSectionStart(frameProfile);
     let ptr = 0;
     const shapeMask = plateShape === "circle" ? fieldGeometry.circleMask : fieldGeometry.squareMask;
     for (let y = 0; y < fieldSize; y += 1) {
@@ -1932,7 +2306,7 @@ function renderField() {
           coolD * themePalette.backdropColor[2] * 0.92 +
           lineStrength * themePalette.lineColor[2] * 0.1;
 
-        if (useGlowColor && colorWeight[ptr] > 1e-6) {
+        if (useGlowColor && hasCpuGlowAccumulation && colorWeight[ptr] > 1e-6) {
           const weight = colorWeight[ptr];
           const avgColor = [
             colorAccum[ptr * 3] / weight,
@@ -1970,12 +2344,27 @@ function renderField() {
       }
     }
     fieldCtx.putImageData(fieldImage, 0, 0);
+    profileSectionEnd(frameProfile, "cpuShade", profileStart);
   }
+  const compositeStart = profileSectionStart(frameProfile);
+  const inset = canvas.width * 0.09;
+  const drawSize = canvas.width - inset * 2;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = toRgba(BASE_BG_COLOR, 1);
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (!useDirectGpuPresentation) {
+    ctx.fillStyle = toRgba(BASE_BG_COLOR, 1);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  } else if (renderStyle === "glow") {
+    ctx.save();
+    ctx.fillStyle = toRgba(BASE_BG_COLOR, 0.94);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.filter = `blur(${(0.35 + singleModeBlur * 0.45).toFixed(2)}px)`;
+    ctx.globalAlpha = 0.28;
+    ctx.drawImage(directGpuUnderlayCanvas, 0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
   const rotateCircleSigned = plateShape === "circle" && combineMode === "signed";
-  if (rotateCircleSigned) {
+  if (!useDirectGpuPresentation && rotateCircleSigned) {
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.rotate(-Math.PI / 2);
@@ -1997,14 +2386,16 @@ function renderField() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
-
-  const inset = canvas.width * 0.09;
-  const drawSize = canvas.width - inset * 2;
-  const smoothedIsolinePath =
-    renderStyle === "glow" || renderStyle === "isoline"
-      ? getIsolinePath(field, displayScale, inset, drawSize, true)
-      : null;
-  if (renderStyle === "glow") {
+  let smoothedIsolinePath = null;
+  if (hasCpuFieldData) {
+    const isolineStart = profileSectionStart(frameProfile);
+    smoothedIsolinePath =
+      renderStyle === "glow" || renderStyle === "isoline"
+        ? getIsolinePath(field, displayScale, inset, drawSize, true)
+        : null;
+    profileSectionEnd(frameProfile, "isoline", isolineStart);
+  }
+  if (!useDirectGpuPresentation && renderStyle === "glow") {
     ctx.save();
     if (plateShape === "circle") {
       ctx.beginPath();
@@ -2019,8 +2410,14 @@ function renderField() {
     ctx.globalAlpha = 0.18;
     ctx.drawImage(baseImageSource, inset, inset, drawSize, drawSize);
     ctx.restore();
+    const glowContourStart = profileSectionStart(frameProfile);
     drawGlowContours(smoothedIsolinePath, inset, drawSize, singleAmpGate, glowColor, themePalette);
-  } else {
+    profileSectionEnd(frameProfile, "glowContours", glowContourStart);
+  } else if (useDirectGpuPresentation && renderStyle === "glow" && smoothedIsolinePath) {
+    const glowContourStart = profileSectionStart(frameProfile);
+    drawGlowContours(smoothedIsolinePath, inset, drawSize, singleAmpGate, glowColor, themePalette);
+    profileSectionEnd(frameProfile, "glowContours", glowContourStart);
+  } else if (!useDirectGpuPresentation) {
     ctx.save();
     ctx.shadowColor = toRgba(themePalette.outerColor, 0.12);
     ctx.shadowBlur = 14;
@@ -2061,9 +2458,11 @@ function renderField() {
   if (plateShape !== "circle") {
     ctx.strokeRect(inset, inset, canvas.width - inset * 2, canvas.height - inset * 2);
   }
-  if (rotateCircleSigned) {
+  if (!useDirectGpuPresentation && rotateCircleSigned) {
     ctx.restore();
   }
+  profileSectionEnd(frameProfile, "composite", compositeStart);
+  finishFrameProfile(frameProfile);
 }
 
 function requestRender() {
@@ -2247,16 +2646,44 @@ audio.addEventListener("ended", () => {
   requestRender();
 });
 
+window.addEventListener("keydown", (event) => {
+  if (!event.shiftKey || event.key.toLowerCase() !== "p") {
+    if (event.shiftKey && event.key.toLowerCase() === "g") {
+      event.preventDefault();
+      const nextEnabled = !rendererFlags.directGpuPresentation;
+      setDirectGpuPresentationEnabled(nextEnabled);
+      statusNode.textContent = nextEnabled
+        ? "Experimental direct GPU path enabled. Press Shift+G to disable it."
+        : "Experimental direct GPU path disabled.";
+    }
+    return;
+  }
+  event.preventDefault();
+  const nextEnabled = !profiler.enabled;
+  setProfilerEnabled(nextEnabled);
+  statusNode.textContent = nextEnabled
+    ? "Profiler enabled. Press Shift+P to hide it."
+    : "Profiler disabled.";
+});
+
 window.addEventListener("resize", () => {
   const ratio = window.devicePixelRatio || 1;
-  const size = Math.min(canvas.clientWidth || 1280, canvas.clientHeight || 1280);
-  canvas.width = Math.max(512, Math.round(size * ratio));
-  canvas.height = canvas.width;
+  const stageWidth = canvas.parentElement?.clientWidth || canvas.clientWidth || 1280;
+  const stageHeight = canvas.parentElement?.clientHeight || canvas.clientHeight || 1280;
+  const size = Math.min(stageWidth, stageHeight);
+  const backingSize = Math.max(512, Math.round(size * ratio));
+  canvas.width = backingSize;
+  canvas.height = backingSize;
+  glCanvas.width = backingSize;
+  glCanvas.height = backingSize;
+  clearGpuPresentation();
+  setGpuCanvasFrame(rendererFlags.directGpuPresentation);
   requestRender();
 });
 
 window.dispatchEvent(new Event("resize"));
 initializeFieldGeometry();
+rebuildPlateUnderlayCanvases();
 syncThemeInputs();
 modeState = buildModes(Math.round(numericControls.modeCount));
 controls.singleModeIndex.max = String(Math.round(numericControls.modeCount));

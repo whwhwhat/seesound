@@ -217,13 +217,37 @@ output {
   min-height: 0;
 }
 
-#preview {
+.viewport-stage {
+  position: relative;
   width: min(100%, calc(100vh - 60px));
   aspect-ratio: 1;
+}
+
+#previewGl,
+#preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   border-radius: 28px;
+}
+
+#previewGl {
   background:
     radial-gradient(circle at center, rgba(210, 245, 147, 0.02), transparent 40%),
     #020609;
+  opacity: 0;
+  transition: opacity 140ms ease;
+  pointer-events: none;
+  transform-origin: center center;
+}
+
+#previewGl.is-visible {
+  opacity: 1;
+}
+
+#preview {
+  background: transparent;
 }
 
 @media (max-width: 960px) {
@@ -236,7 +260,7 @@ output {
     height: auto;
   }
 
-  #preview {
+  .viewport-stage {
     width: 100%;
   }
 

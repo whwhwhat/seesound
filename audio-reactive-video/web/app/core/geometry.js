@@ -10,18 +10,17 @@ import {
   fieldSize,
   fieldStride,
   numericControls,
-  plateUnderlayCanvases,
   renderBuffers,
   spatialAtlasCache,
   spatialCache,
   state,
-} from "./app-context.js";
+} from "../state/context.js";
 import {
   besselJ,
   clamp,
   noise2D,
   smoothstep,
-} from "./app-utils.js";
+} from "./utils.js";
 
 function initializeFieldGeometry() {
   let ptr = 0;
@@ -43,24 +42,6 @@ function initializeFieldGeometry() {
       fieldGeometry.dither[ptr] = (noise2D(x + 17, y + 29) - 0.5) * 0.018;
       ptr += 1;
     }
-  }
-}
-
-function rebuildPlateUnderlayCanvases() {
-  for (const shape of ["square", "circle"]) {
-    const underlayCanvas = plateUnderlayCanvases[shape];
-    const underlayCtx = underlayCanvas.getContext("2d");
-    const image = underlayCtx.createImageData(fieldSize, fieldSize);
-    const imageData = image.data;
-    const mask = shape === "circle" ? fieldGeometry.circleMask : fieldGeometry.squareMask;
-    for (let ptr = 0; ptr < mask.length; ptr += 1) {
-      const alpha = Math.round(clamp(mask[ptr], 0, 1) * 255);
-      imageData[ptr * 4] = BASE_BG_COLOR[0];
-      imageData[ptr * 4 + 1] = BASE_BG_COLOR[1];
-      imageData[ptr * 4 + 2] = BASE_BG_COLOR[2];
-      imageData[ptr * 4 + 3] = alpha;
-    }
-    underlayCtx.putImageData(image, 0, 0);
   }
 }
 
@@ -308,7 +289,6 @@ export {
   getSpatialMode,
   initializeFieldGeometry,
   percentileOfField,
-  rebuildPlateUnderlayCanvases,
   removeRadialAverage,
   resetRenderBuffers,
   updateDirectGpuUnderlay,

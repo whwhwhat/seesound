@@ -2,23 +2,21 @@ import {
   controls,
   numericControls,
   state,
-} from "./app-context.js";
+} from "./state/context.js";
 import {
   buildModes,
   syncControlVisibility,
   syncThemeInputs,
   updateModeLabel,
-} from "./app-core.js";
+} from "./core/runtime.js";
 import {
   bindEventHandlers,
-} from "./app-events.js";
+} from "./ui/events.js";
 import {
   initializeFieldGeometry,
-  rebuildPlateUnderlayCanvases,
-} from "./app-geometry.js";
+} from "./core/geometry.js";
 
 initializeFieldGeometry();
-rebuildPlateUnderlayCanvases();
 syncThemeInputs();
 state.modeState = buildModes(Math.round(numericControls.modeCount));
 controls.singleModeIndex.max = String(Math.round(numericControls.modeCount));

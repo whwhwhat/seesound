@@ -4,13 +4,10 @@ const glCanvas = document.getElementById("previewGl");
 const audio = document.getElementById("audio");
 const fileInput = document.getElementById("audioFile");
 const statusNode = document.getElementById("status");
-const plateShapeRoot = document.getElementById("plateShape");
-const plateShapeButtons = Array.from(plateShapeRoot.querySelectorAll("button[data-shape]"));
+const plateShapeButtons = Array.from(document.getElementById("plateShape").querySelectorAll("button[data-shape]"));
 const angularRotationWrap = document.getElementById("angularRotationWrap");
-const renderStyleRoot = document.getElementById("renderStyle");
-const renderStyleButtons = Array.from(renderStyleRoot.querySelectorAll("button[data-render-style]"));
-const frameRateLimitRoot = document.getElementById("frameRateLimit");
-const frameRateLimitButtons = Array.from(frameRateLimitRoot.querySelectorAll("button[data-frame-rate]"));
+const renderStyleButtons = Array.from(document.getElementById("renderStyle").querySelectorAll("button[data-render-style]"));
+const frameRateLimitButtons = Array.from(document.getElementById("frameRateLimit").querySelectorAll("button[data-frame-rate]"));
 const atmosphereWrap = document.getElementById("atmosphereWrap");
 const atmosphereEnabledInput = document.getElementById("atmosphereEnabled");
 const glowThicknessWrap = document.getElementById("glowThicknessWrap");
@@ -25,16 +22,14 @@ const themeSelect = document.getElementById("themeSelect");
 const lowColorInput = document.getElementById("lowColor");
 const midColorInput = document.getElementById("midColor");
 const highColorInput = document.getElementById("highColor");
-const displayModeRoot = document.getElementById("displayMode");
-const displayModeButtons = Array.from(displayModeRoot.querySelectorAll("button[data-mode]"));
+const displayModeButtons = Array.from(document.getElementById("displayMode").querySelectorAll("button[data-mode]"));
 const combineModeWrap = document.getElementById("combineModeWrap");
 const combineModeSelect = document.getElementById("combineMode");
 const singleModeWrap = document.getElementById("singleModeWrap");
 const modeLabel = document.getElementById("modeLabel");
 const bandLabel = document.getElementById("bandLabel");
 const singleModeViewWrap = document.getElementById("singleModeViewWrap");
-const singleModeViewRoot = document.getElementById("singleModeView");
-const singleModeViewButtons = Array.from(singleModeViewRoot.querySelectorAll("button[data-single-view]"));
+const singleModeViewButtons = Array.from(document.getElementById("singleModeView").querySelectorAll("button[data-single-view]"));
 const nodalFocusWrap = document.getElementById("nodalFocusWrap");
 const contrastWrap = document.getElementById("contrastWrap");
 const singleModeIndexOutput = document.querySelector('output[for="singleModeIndex"]');
@@ -125,15 +120,6 @@ directGpuUnderlayCanvas.width = fieldSize;
 directGpuUnderlayCanvas.height = fieldSize;
 const directGpuUnderlayCtx = directGpuUnderlayCanvas.getContext("2d");
 const directGpuUnderlayImage = directGpuUnderlayCtx.createImageData(fieldSize, fieldSize);
-
-const plateUnderlayCanvases = {
-  square: document.createElement("canvas"),
-  circle: document.createElement("canvas"),
-};
-plateUnderlayCanvases.square.width = fieldSize;
-plateUnderlayCanvases.square.height = fieldSize;
-plateUnderlayCanvases.circle.width = fieldSize;
-plateUnderlayCanvases.circle.height = fieldSize;
 
 const glowCanvas = document.createElement("canvas");
 glowCanvas.width = 2048;
@@ -532,7 +518,6 @@ export {
   colorSeparationWrap,
   combineModeSelect,
   combineModeWrap,
-  controlIds,
   controls,
   contourPathCache,
   contrastWrap,
@@ -541,7 +526,6 @@ export {
   directGpuUnderlayCtx,
   directGpuUnderlayImage,
   displayModeButtons,
-  displayModeRoot,
   fieldCanvas,
   fieldCellCount,
   fieldCtx,
@@ -551,7 +535,6 @@ export {
   fieldStride,
   fileInput,
   frameRateLimitButtons,
-  frameRateLimitRoot,
   glCanvas,
   glowCanvas,
   glowCtx,
@@ -570,18 +553,12 @@ export {
   nodalFocusWrap,
   numericControls,
   plateShapeButtons,
-  plateShapeRoot,
-  plateUnderlayCanvases,
   profiler,
-  readDirectGpuPreference,
-  readProfilePreference,
   renderBuffers,
   rendererFlags,
   renderStyleButtons,
-  renderStyleRoot,
   singleModeIndexOutput,
   singleModeViewButtons,
-  singleModeViewRoot,
   singleModeViewWrap,
   singleModeWrap,
   spatialAtlasCache,

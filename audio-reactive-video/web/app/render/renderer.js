@@ -19,7 +19,7 @@ import {
   renderBuffers,
   rendererFlags,
   state,
-} from "./app-context.js";
+} from "../state/context.js";
 import {
   beginFrameProfile,
   buildModeRenderState,
@@ -29,7 +29,7 @@ import {
   profileSectionEnd,
   profileSectionStart,
   updateModeState,
-} from "./app-core.js";
+} from "../core/runtime.js";
 import {
   ensureSpatialAtlas,
   getSpatialMode,
@@ -37,7 +37,7 @@ import {
   removeRadialAverage,
   resetRenderBuffers,
   updateDirectGpuUnderlay,
-} from "./app-geometry.js";
+} from "../core/geometry.js";
 import {
   clearGpuPresentation,
   readGpuFieldIntoCpuBuffer,
@@ -49,13 +49,13 @@ import {
   shadeFieldOnGpu,
   shouldValidateGpuField,
   validateGpuFieldAgainstCpu,
-} from "./app-gpu.js";
+} from "./gpu.js";
 import {
   clamp,
   lerp,
   lerpColor,
   toRgba,
-} from "./app-utils.js";
+} from "../core/utils.js";
 
 function interpolatePoint(ax, ay, av, bx, by, bv) {
   const denom = bv - av;

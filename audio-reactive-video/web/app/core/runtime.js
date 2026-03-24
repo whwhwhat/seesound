@@ -14,7 +14,6 @@ import {
   combineModeWrap,
   contrastWrap,
   controls,
-  displayModeButtons,
   glowSpreadWrap,
   glowThicknessWrap,
   highColorInput,
@@ -36,20 +35,19 @@ import {
   themeSelect,
   themeWrap,
   writeProfilePreference,
-} from "./app-context.js";
+} from "../state/context.js";
 import {
   clamp,
-  hexToRgb,
   lerp,
   lerpColor,
   mixColor3,
   rgbToHex,
   toMel,
-} from "./app-utils.js";
+} from "./utils.js";
 import {
   ensureInactiveBands,
   getBandRanges,
-} from "./app-geometry.js";
+} from "./geometry.js";
 
 function ensureProfilerOverlay() {
   if (!profiler.enabled) {

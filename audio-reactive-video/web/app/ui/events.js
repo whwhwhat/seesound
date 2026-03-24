@@ -2,7 +2,6 @@ import {
   audio,
   canvas,
   combineModeSelect,
-  controlIds,
   controls,
   displayModeButtons,
   fileInput,
@@ -21,7 +20,7 @@ import {
   themeSelect,
   writeDirectGpuPreference,
   glCanvas,
-} from "./app-context.js";
+} from "../state/context.js";
 import {
   applyTheme,
   buildModes,
@@ -30,22 +29,22 @@ import {
   syncControlVisibility,
   syncThemeInputs,
   updateModeLabel,
-} from "./app-core.js";
+} from "../core/runtime.js";
 import {
   clearSpatialCache,
-} from "./app-geometry.js";
+} from "../core/geometry.js";
 import {
   clearGpuPresentation,
   setGpuCanvasFrame,
-} from "./app-gpu.js";
+} from "../render/gpu.js";
 import {
   requestRender,
   startAnimationLoop,
   stopAnimationLoop,
-} from "./app-render.js";
+} from "../render/renderer.js";
 import {
   hexToRgb,
-} from "./app-utils.js";
+} from "../core/utils.js";
 
 let eventsBound = false;
 
@@ -55,8 +54,8 @@ function bindEventHandlers() {
   }
   eventsBound = true;
 
-  for (const id of controlIds) {
-    controls[id].addEventListener("input", () => {
+  for (const input of Object.values(controls)) {
+    input.addEventListener("input", () => {
       requestRender();
     });
   }

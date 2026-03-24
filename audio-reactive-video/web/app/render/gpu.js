@@ -14,7 +14,7 @@ import {
   gpuShadePipeline,
   renderBuffers,
   state,
-} from "./app-context.js";
+} from "../state/context.js";
 
 function createGlShader(gl, type, source) {
   const shader = gl.createShader(type);

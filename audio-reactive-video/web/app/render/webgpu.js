@@ -7,11 +7,20 @@ import {
   state,
   wgpuCanvas,
 } from "../state/context.js";
+import {
+  clamp,
+  lerpColor,
+} from "../core/utils.js";
 
 const MAX_MODES = 48;
+const FIELD_STRIDE = fieldSize - 1;
+const MAX_CONTOUR_SEGMENTS = FIELD_STRIDE * FIELD_STRIDE * 2;
+const SEGMENT_STRIDE_BYTES = 32;
 const WEBGPU_FIELD_FORMAT = "rgba16float";
 const WEBGPU_ATLAS_FORMAT = "r32float";
 const WEBGPU_DITHER_FORMAT = "r32float";
+const PRESENTATION_SUPERSAMPLE = 2;
+const PRESENTATION_MAX_SIZE = 2048;
 
 const FULLSCREEN_VERTEX_SHADER = `
 struct VertexOut {
@@ -121,19 +130,15 @@ fn main(@builtin(position) position : vec4f) -> @location(0) vec4f {
 }
 `;
 
-const SHADE_SHADER = `
-struct ShadeParams {
+const BACKGROUND_SHADER = `
+struct BackgroundParams {
   canvasSize : vec4f,
-  dynamicsA : vec4f,
-  dynamicsB : vec4f,
+  dynamics : vec4f,
   renderFlags : vec4f,
-  extras : vec4f,
   baseBgColor : vec4f,
   backdropColor : vec4f,
   baseColor : vec4f,
-  lineColor : vec4f,
   outerColor : vec4f,
-  glowColor : vec4f,
   atmosphereCore : vec4f,
   atmosphereOuter : vec4f,
 };
@@ -143,20 +148,35 @@ struct ShadeParams {
 @group(0) @binding(2) var colorWeightTex : texture_2d<f32>;
 @group(0) @binding(3) var maxFieldTex : texture_2d<f32>;
 @group(0) @binding(4) var ditherTex : texture_2d<f32>;
-@group(0) @binding(5) var<uniform> params : ShadeParams;
+@group(0) @binding(5) var<uniform> params : BackgroundParams;
 
 fn clamp01(value : f32) -> f32 {
   return clamp(value, 0.0, 1.0);
 }
 
-fn sampleField(coord : vec2i) -> f32 {
-  let maxCoord = vec2i(${fieldSize - 1}, ${fieldSize - 1});
-  return textureLoad(fieldTex, clamp(coord, vec2i(0), maxCoord), 0).x;
+fn sampleTextureBilinear(tex : texture_2d<f32>, coord : vec2f) -> vec4f {
+  let maxCoordF = vec2f(${fieldSize - 1}, ${fieldSize - 1});
+  let maxCoordI = vec2i(${fieldSize - 1}, ${fieldSize - 1});
+  let clamped = clamp(coord, vec2f(0.0), maxCoordF);
+  let base = floor(clamped);
+  let frac = clamped - base;
+  let i00 = vec2i(base);
+  let i10 = min(i00 + vec2i(1, 0), maxCoordI);
+  let i01 = min(i00 + vec2i(0, 1), maxCoordI);
+  let i11 = min(i00 + vec2i(1, 1), maxCoordI);
+  let s00 = textureLoad(tex, i00, 0);
+  let s10 = textureLoad(tex, i10, 0);
+  let s01 = textureLoad(tex, i01, 0);
+  let s11 = textureLoad(tex, i11, 0);
+  let sx0 = mix(s00, s10, frac.x);
+  let sx1 = mix(s01, s11, frac.x);
+  return mix(sx0, sx1, frac.y);
 }
 
-fn sampleDither(coord : vec2i) -> f32 {
-  let maxCoord = vec2i(${fieldSize - 1}, ${fieldSize - 1});
-  return textureLoad(ditherTex, clamp(coord, vec2i(0), maxCoord), 0).x;
+fn sampleRepeatedDither(uv : vec2f) -> f32 {
+  let tiledUv = fract(uv * vec2f(3.11, 2.73) + vec2f(0.17, 0.29));
+  let coord = tiledUv * f32(${fieldSize - 1});
+  return sampleTextureBilinear(ditherTex, coord).x;
 }
 
 @fragment
@@ -171,108 +191,68 @@ fn main(@builtin(position) position : vec4f) -> @location(0) vec4f {
   var color = params.baseBgColor.rgb;
   let globalCentered = uv - vec2f(0.5);
   let distanceToCenter = length(globalCentered);
+  let atmosphereDither = sampleRepeatedDither(uv);
   if (params.renderFlags.z > 0.5) {
-    let atmosphereMix = (1.0 - smoothstep(0.06, 0.48, distanceToCenter)) * 0.14;
-    let atmosphereEdge = (1.0 - smoothstep(0.18, 0.52, distanceToCenter)) * 0.08;
-    color += params.atmosphereCore.rgb * atmosphereMix + params.atmosphereOuter.rgb * atmosphereEdge;
+    let atmosphereMix = (1.0 - smoothstep(0.04, 0.52, distanceToCenter)) * 0.085;
+    let atmosphereEdge = (1.0 - smoothstep(0.14, 0.58, distanceToCenter)) * 0.038;
+    let atmosphereNoise = atmosphereDither * 52.0 * clamp01((atmosphereMix + atmosphereEdge) * 7.5);
+    color += params.atmosphereCore.rgb * atmosphereMix + params.atmosphereOuter.rgb * atmosphereEdge + vec3f(atmosphereNoise);
   }
 
   if (!insideRect) {
     return vec4f(clamp(color / 255.0, vec3f(0.0), vec3f(1.0)), 1.0);
   }
 
-  let fieldCoordF = clamp(localUv, vec2f(0.0), vec2f(1.0)) * f32(${fieldSize - 1});
-  let fieldCoord = vec2i(fieldCoordF + vec2f(0.5));
-  let rawField = sampleField(fieldCoord);
+  let fieldCoord = clamp(localUv, vec2f(0.0), vec2f(1.0)) * f32(${fieldSize - 1});
+  let field = sampleTextureBilinear(fieldTex, fieldCoord).x;
   let maxAbs = max(textureLoad(maxFieldTex, vec2i(0, 0), 0).x, 1e-6);
   let displayScale = select(maxAbs, 1.0, params.renderFlags.x > 0.5);
-  let normalizedField = rawField / max(displayScale, 1e-6);
+  let normalizedField = field / max(displayScale, 1e-6);
+  let dither = sampleTextureBilinear(ditherTex, fieldCoord).x;
 
-  let gx = (sampleField(fieldCoord + vec2i(1, 0)) - sampleField(fieldCoord - vec2i(1, 0))) * 0.5;
-  let gy = (sampleField(fieldCoord + vec2i(0, 1)) - sampleField(fieldCoord - vec2i(0, 1))) * 0.5;
-  let gradientLength = max(length(vec2f(gx, gy)), 1e-5);
-  let contourDistance = abs(rawField) / gradientLength;
-  let normalizedGradient = clamp01(gradientLength / max(displayScale, 1e-6) * 2.6);
-  let absValue = abs(normalizedField);
-  let dither = sampleDither(fieldCoord);
-
+  let gx = textureLoad(fieldTex, min(vec2i(fieldCoord) + vec2i(1, 0), vec2i(${fieldSize - 1}, ${fieldSize - 1})), 0).x - field;
+  let gy = textureLoad(fieldTex, min(vec2i(fieldCoord) + vec2i(0, 1), vec2i(${fieldSize - 1}, ${fieldSize - 1})), 0).x - field;
+  let gradient = min(1.0, (abs(gx) + abs(gy)) / max(displayScale, 1e-6) * 2.6);
   let centered = localUv - vec2f(0.5);
   let squareRadius = length(centered) / 0.72;
   let circleDistance = length(centered);
-  let shapeMask = select(
+  let mask = select(
     max(0.0, 1.0 - squareRadius * squareRadius),
     1.0 - smoothstep(0.5 - 2.5 / f32(${fieldSize}), 0.5 + 1.5 / f32(${fieldSize}), circleDistance),
     params.renderFlags.y > 0.5
   );
 
-  let thicknessNorm = clamp(params.dynamicsB.y / 4.0, 0.1, 2.4);
-  let spreadNorm = clamp(params.dynamicsB.z / 2.5, 0.08, 4.0);
-  let renderDormant = params.renderFlags.w > 0.5;
-
-  let distanceCore = select(0.0, exp(-contourDistance * (1.6 + params.dynamicsB.y * 0.32)), !renderDormant);
-  let distanceHalo = select(0.0, exp(-contourDistance * (0.7 + params.dynamicsB.z * 0.16)), !renderDormant);
-  let absCore = select(0.0, exp(-absValue * (params.dynamicsA.w / thicknessNorm)), !renderDormant);
-  let absHalo = select(0.0, exp(-absValue * (params.dynamicsB.x / max(0.35, spreadNorm))), !renderDormant);
-  let outerHalo = select(0.0, exp(-contourDistance * (0.42 + spreadNorm * 0.08)), !renderDormant);
-
-  var lineStrength = (distanceCore * 0.8 + absCore * 0.2) * (params.dynamicsA.x + normalizedGradient * 1.25) * params.dynamicsA.z;
-  var haloStrength = (distanceHalo * 0.72 + absHalo * 0.28) * (params.dynamicsA.y + normalizedGradient * 0.22) * params.dynamicsA.z;
-  var glowStrength = outerHalo * (0.06 + spreadNorm * 0.025 + params.dynamicsA.z * 0.05);
-  let displacement = pow(min(1.0, absValue), params.extras.x);
-  var backgroundField = displacement * params.dynamicsB.w * params.dynamicsA.z;
-
-  if (params.extras.z > 0.5) {
-    lineStrength = exp(-contourDistance * (1.8 + params.dynamicsB.y * 0.18)) * (0.42 + params.dynamicsA.z * 0.58);
-    haloStrength = exp(-contourDistance * (0.95 + params.dynamicsB.z * 0.06)) * 0.08;
-    glowStrength = 0.0;
-    backgroundField *= 0.22;
-  }
-
-  let brightness = min(1.0, (lineStrength + haloStrength + glowStrength + backgroundField) * shapeMask);
-  let warm = min(1.0, brightness * (0.7 + params.canvasSize.z * 0.55));
-  let cool = min(1.0, (normalizedGradient * 0.28 + params.canvasSize.w * 0.18 + absHalo * 0.12 + outerHalo * 0.03) * shapeMask);
-  let warmD = clamp01(warm + dither * 0.7);
-  let brightD = clamp01(brightness + dither);
-  let coolD = clamp01(cool + dither * 0.55);
+  let absValue = abs(normalizedField);
+  let nodeHalo = select(0.0, exp(-absValue * (params.dynamics.x / max(0.35, params.dynamics.w))), params.renderFlags.w < 0.5);
+  let outerHalo = select(0.0, exp(-absValue * (params.dynamics.x / max(0.22, params.dynamics.w * 1.45))), params.renderFlags.w < 0.5);
+  let displacement = pow(min(1.0, absValue), params.dynamics.z);
+  let underlayStrength = min(
+    1.0,
+    (displacement * params.dynamics.y * params.dynamics.w * 1.10 + nodeHalo * 0.12 + outerHalo * 0.06 + gradient * 0.04) * mask
+  );
 
   color = vec3f(
-    params.baseBgColor.r + warmD * params.backdropColor.r * 0.82 + brightD * params.baseColor.r * 0.12,
-    params.baseBgColor.g + brightD * params.backdropColor.g * 0.84 + lineStrength * params.lineColor.g * 0.12,
-    params.baseBgColor.b + coolD * params.backdropColor.b * 0.92 + lineStrength * params.lineColor.b * 0.1
+    params.baseBgColor.r + underlayStrength * params.backdropColor.r * 0.24,
+    params.baseBgColor.g + underlayStrength * params.backdropColor.g * 0.26,
+    params.baseBgColor.b + underlayStrength * params.backdropColor.b * 0.30
   );
-  color += params.outerColor.rgb * glowStrength * 0.14;
-  color += params.glowColor.rgb * glowStrength * (0.08 + spreadNorm * 0.015);
 
-  if (params.renderFlags.z > 0.5) {
-    let atmosphereMix = (1.0 - smoothstep(0.06, 0.48, distanceToCenter)) * (0.14 + brightness * 0.1);
-    let atmosphereEdge = (1.0 - smoothstep(0.18, 0.52, distanceToCenter)) * 0.08;
-    color += params.atmosphereCore.rgb * atmosphereMix + params.atmosphereOuter.rgb * atmosphereEdge;
+  let accum = sampleTextureBilinear(colorAccumTex, fieldCoord).rgb;
+  let weight = sampleTextureBilinear(colorWeightTex, fieldCoord).x;
+  if (weight > 1e-6) {
+    let avgColor = accum / weight;
+    let tintMix = clamp(underlayStrength * 0.18, 0.0, 0.24);
+    color = mix(color, avgColor * 0.35 + color * 0.65, tintMix);
   }
 
-  if (params.extras.y > 0.5) {
-    let accum = textureLoad(colorAccumTex, fieldCoord, 0).rgb;
-    let weight = textureLoad(colorWeightTex, fieldCoord, 0).x;
-    if (weight > 1e-6) {
-      let avgColor = accum / weight;
-      let monoLuma = dot(color, vec3f(0.2126, 0.7152, 0.0722));
-      let avgLuma = dot(avgColor, vec3f(0.2126, 0.7152, 0.0722));
-      let luminanceScale = monoLuma / max(avgLuma, 1.0);
-      let tinted = clamp(avgColor * luminanceScale, vec3f(0.0), vec3f(255.0));
-      let boostedTint = vec3f(
-        clamp(tinted.r * (0.98 - params.extras.w * 0.06), 0.0, 255.0),
-        clamp(tinted.g * (1.0 + params.extras.w * 0.03), 0.0, 255.0),
-        clamp(tinted.b * (1.03 + params.extras.w * 0.16), 0.0, 255.0)
-      );
-      let tintMix = clamp(
-        0.18 + params.extras.w * 0.16
-        + lineStrength * (0.96 + params.extras.w * 0.22)
-        + haloStrength * (0.64 + params.extras.w * 0.16)
-        + backgroundField * (0.34 + params.extras.w * 0.08),
-        0.0,
-        0.98
-      );
-      color = mix(color, boostedTint, tintMix);
-    }
+  let warmD = clamp01(underlayStrength + dither * 0.16);
+  color += params.baseColor.rgb * warmD * 0.022;
+
+  if (params.renderFlags.z > 0.5) {
+    let atmosphereMix = (1.0 - smoothstep(0.04, 0.52, distanceToCenter)) * (0.072 + underlayStrength * 0.038);
+    let atmosphereEdge = (1.0 - smoothstep(0.14, 0.58, distanceToCenter)) * 0.032;
+    let atmosphereNoise = atmosphereDither * 60.0 * clamp01((atmosphereMix + atmosphereEdge) * 8.0 + underlayStrength * 0.22);
+    color += params.atmosphereCore.rgb * atmosphereMix + params.atmosphereOuter.rgb * atmosphereEdge + vec3f(atmosphereNoise);
   }
 
   if (params.renderFlags.y > 0.5) {
@@ -294,6 +274,283 @@ fn main(@builtin(position) position : vec4f) -> @location(0) vec4f {
 }
 `;
 
+const BLUR_SHADER = `
+struct VertexOut {
+  @builtin(position) position : vec4f,
+  @location(0) uv : vec2f,
+};
+
+struct BlurParams {
+  canvasMetrics : vec4f,
+  directionSigma : vec4f,
+};
+
+@group(0) @binding(0) var srcSampler : sampler;
+@group(0) @binding(1) var srcTex : texture_2d<f32>;
+@group(0) @binding(2) var<uniform> params : BlurParams;
+
+@vertex
+fn vsMain(@builtin(vertex_index) vertexIndex : u32) -> VertexOut {
+  var positions = array<vec2f, 3>(
+    vec2f(-1.0, -3.0),
+    vec2f(-1.0, 1.0),
+    vec2f(3.0, 1.0),
+  );
+  var out : VertexOut;
+  let pos = positions[vertexIndex];
+  out.position = vec4f(pos, 0.0, 1.0);
+  out.uv = vec2f(pos.x * 0.5 + 0.5, 1.0 - (pos.y * 0.5 + 0.5));
+  return out;
+}
+
+@fragment
+fn fsMain(@location(0) uv : vec2f) -> @location(0) vec4f {
+  let invSize = max(params.canvasMetrics.xy, vec2f(1e-6));
+  let dir = params.directionSigma.xy / invSize;
+  let sigma = max(params.directionSigma.z, 0.001);
+  let opacity = params.directionSigma.w;
+  let sampleStep = max(sigma / 4.0, 1.0);
+
+  var accum = vec4f(0.0);
+  var weightSum = 0.0;
+  for (var i = -8; i <= 8; i += 1) {
+    let offset = f32(i) * sampleStep;
+    let weight = exp(-(offset * offset) / (2.0 * sigma * sigma));
+    accum += textureSampleLevel(srcTex, srcSampler, uv + dir * offset, 0.0) * weight;
+    weightSum += weight;
+  }
+
+  let color = accum / max(weightSum, 1e-6);
+  return color * opacity;
+}
+`;
+
+const CONTOUR_COMPUTE_SHADER = `
+struct Segment {
+  p0 : vec2f,
+  p1 : vec2f,
+  payload : vec4f,
+};
+
+struct ContourParams {
+  shapeMode : u32,
+  _pad0 : u32,
+  _pad1 : u32,
+  _pad2 : u32,
+};
+
+@group(0) @binding(0) var fieldTex : texture_2d<f32>;
+@group(0) @binding(1) var<storage, read_write> segments : array<Segment>;
+@group(0) @binding(2) var<uniform> params : ContourParams;
+
+fn interpolatePoint(ax : f32, ay : f32, av : f32, bx : f32, by : f32, bv : f32) -> vec2f {
+  let denom = bv - av;
+  var t = 0.5;
+  if (abs(denom) >= 1e-6) {
+    t = (0.0 - av) / denom;
+  }
+  return vec2f(mix(ax, bx, t), mix(ay, by, t));
+}
+
+fn writeEmpty(index : u32) {
+  segments[index].p0 = vec2f(0.0);
+  segments[index].p1 = vec2f(0.0);
+  segments[index].payload = vec4f(0.0);
+}
+
+fn writeSegment(index : u32, p0 : vec2f, p1 : vec2f) {
+  segments[index].p0 = p0;
+  segments[index].p1 = p1;
+  segments[index].payload = vec4f(1.0, 0.0, 0.0, 0.0);
+}
+
+@compute @workgroup_size(8, 8, 1)
+fn main(@builtin(global_invocation_id) gid : vec3u) {
+  if (gid.x >= ${FIELD_STRIDE}u || gid.y >= ${FIELD_STRIDE}u) {
+    return;
+  }
+
+  let baseIndex = (gid.y * ${FIELD_STRIDE}u + gid.x) * 2u;
+  writeEmpty(baseIndex);
+  writeEmpty(baseIndex + 1u);
+
+  if (params.shapeMode == 1u) {
+    let cx = f32(gid.x) + 0.5;
+    let cy = f32(gid.y) + 0.5;
+    let nx = (cx / f32(${FIELD_STRIDE})) * 2.0 - 1.0;
+    let ny = (cy / f32(${FIELD_STRIDE})) * 2.0 - 1.0;
+    let distanceToRim = 1.0 - sqrt(nx * nx + ny * ny);
+    if (distanceToRim < 0.015) {
+      return;
+    }
+  }
+
+  let x = i32(gid.x);
+  let y = i32(gid.y);
+  let tl = textureLoad(fieldTex, vec2i(x, y), 0).x;
+  let tr = textureLoad(fieldTex, vec2i(x + 1, y), 0).x;
+  let br = textureLoad(fieldTex, vec2i(x + 1, y + 1), 0).x;
+  let bl = textureLoad(fieldTex, vec2i(x, y + 1), 0).x;
+
+  var points : array<vec2f, 4>;
+  var pointCount : u32 = 0u;
+
+  if ((tl <= 0.0 && tr > 0.0) || (tl > 0.0 && tr <= 0.0)) {
+    points[pointCount] = interpolatePoint(f32(x), f32(y), tl, f32(x + 1), f32(y), tr);
+    pointCount += 1u;
+  }
+  if ((tr <= 0.0 && br > 0.0) || (tr > 0.0 && br <= 0.0)) {
+    points[pointCount] = interpolatePoint(f32(x + 1), f32(y), tr, f32(x + 1), f32(y + 1), br);
+    pointCount += 1u;
+  }
+  if ((br <= 0.0 && bl > 0.0) || (br > 0.0 && bl <= 0.0)) {
+    points[pointCount] = interpolatePoint(f32(x + 1), f32(y + 1), br, f32(x), f32(y + 1), bl);
+    pointCount += 1u;
+  }
+  if ((bl <= 0.0 && tl > 0.0) || (bl > 0.0 && tl <= 0.0)) {
+    points[pointCount] = interpolatePoint(f32(x), f32(y + 1), bl, f32(x), f32(y), tl);
+    pointCount += 1u;
+  }
+
+  if (pointCount == 2u) {
+    writeSegment(baseIndex, points[0], points[1]);
+  } else if (pointCount == 4u) {
+    writeSegment(baseIndex, points[0], points[1]);
+    writeSegment(baseIndex + 1u, points[2], points[3]);
+  }
+}
+`;
+
+const SEGMENT_RENDER_SHADER = `
+struct Segment {
+  p0 : vec2f,
+  p1 : vec2f,
+  payload : vec4f,
+};
+
+struct LineParams {
+  canvasMetrics : vec4f,
+  style : vec4f,
+  color : vec4f,
+  flags : vec4f,
+};
+
+struct VertexOut {
+  @builtin(position) position : vec4f,
+  @location(0) p0 : vec2f,
+  @location(1) p1 : vec2f,
+  @location(2) visibility : f32,
+};
+
+@group(0) @binding(0) var<storage, read> segments : array<Segment>;
+@group(0) @binding(1) var<uniform> params : LineParams;
+
+fn normalizeSafe(vector : vec2f) -> vec2f {
+  let lengthSq = max(dot(vector, vector), 1e-8);
+  return vector * inverseSqrt(lengthSq);
+}
+
+@vertex
+fn vsMain(
+  @builtin(vertex_index) vertexIndex : u32,
+  @builtin(instance_index) instanceIndex : u32,
+) -> VertexOut {
+  let segment = segments[instanceIndex];
+  var out : VertexOut;
+  out.visibility = segment.payload.x;
+  out.p0 = vec2f(0.0);
+  out.p1 = vec2f(0.0);
+
+  if (segment.payload.x < 0.5) {
+    out.position = vec4f(-2.0, -2.0, 0.0, 1.0);
+    return out;
+  }
+
+  let inset = params.canvasMetrics.z;
+  let drawSize = params.canvasMetrics.w;
+  let canvasSize = max(params.canvasMetrics.xy, vec2f(1.0));
+  let a = vec2f(
+    inset + (segment.p0.x / f32(${FIELD_STRIDE})) * drawSize,
+    inset + (segment.p0.y / f32(${FIELD_STRIDE})) * drawSize
+  );
+  let b = vec2f(
+    inset + (segment.p1.x / f32(${FIELD_STRIDE})) * drawSize,
+    inset + (segment.p1.y / f32(${FIELD_STRIDE})) * drawSize
+  );
+  out.p0 = a;
+  out.p1 = b;
+
+  let direction = normalizeSafe(b - a);
+  let normal = vec2f(-direction.y, direction.x);
+  let blurRadius = params.style.y;
+  let halfSpan = params.style.x * 0.5 + blurRadius * 2.5 + 2.0;
+  let alongExtend = blurRadius * 2.5 + 2.0;
+  let corners = array<vec2f, 6>(
+    vec2f(-1.0, -1.0),
+    vec2f(-1.0, 1.0),
+    vec2f(1.0, -1.0),
+    vec2f(1.0, -1.0),
+    vec2f(-1.0, 1.0),
+    vec2f(1.0, 1.0)
+  );
+  let corner = corners[vertexIndex];
+  let base = mix(a, b, (corner.x + 1.0) * 0.5);
+  let world = base + direction * (corner.x * alongExtend) + normal * (corner.y * halfSpan);
+  let clip = vec2f(
+    world.x / canvasSize.x * 2.0 - 1.0,
+    1.0 - world.y / canvasSize.y * 2.0
+  );
+  out.position = vec4f(clip, 0.0, 1.0);
+  return out;
+}
+
+fn segmentDistance(point : vec2f, a : vec2f, b : vec2f) -> f32 {
+  let ab = b - a;
+  let denom = max(dot(ab, ab), 1e-6);
+  let t = clamp(dot(point - a, ab) / denom, 0.0, 1.0);
+  return length(point - (a + ab * t));
+}
+
+@fragment
+fn fsMain(
+  @builtin(position) position : vec4f,
+  @location(0) p0 : vec2f,
+  @location(1) p1 : vec2f,
+  @location(2) visibility : f32,
+) -> @location(0) vec4f {
+  if (visibility < 0.5) {
+    discard;
+  }
+
+  if (params.flags.x > 0.5) {
+    let center = params.canvasMetrics.xy * 0.5;
+    let radius = params.canvasMetrics.w * 0.5;
+    if (distance(position.xy, center) > radius) {
+      discard;
+    }
+  }
+
+  let distanceToSegment = segmentDistance(position.xy, p0, p1);
+  let halfWidth = params.style.x * 0.5;
+  var alpha = 0.0;
+  if (params.flags.y < 0.5) {
+    let sigma = max(params.style.y * 0.18, 0.28);
+    let intensity = min(3.4, 0.9 + 2.2 / (sigma + 0.35));
+    let bodyRadius = max(halfWidth * 0.72, 0.45);
+    let edgeDistance = max(distanceToSegment - bodyRadius, 0.0);
+    let centerPreserve = 0.14 + 0.86 * smoothstep(bodyRadius * 0.55, bodyRadius + sigma * 0.9, distanceToSegment);
+    alpha = params.style.z * intensity * centerPreserve * exp(-(edgeDistance * edgeDistance) / (2.0 * sigma * sigma));
+  } else {
+    let crispHalfWidth = halfWidth * 0.94;
+    alpha = params.style.z * (1.0 - smoothstep(crispHalfWidth, crispHalfWidth + 0.85, distanceToSegment));
+  }
+
+  let resolvedAlpha = clamp(alpha, 0.0, 1.0);
+  let resolvedColor = clamp(params.color.rgb / 255.0, vec3f(0.0), vec3f(1.0)) * resolvedAlpha;
+  return vec4f(resolvedColor, resolvedAlpha);
+}
+`;
+
 const webGpuState = {
   adapter: null,
   device: null,
@@ -306,7 +563,11 @@ const webGpuState = {
   uploadedAtlasKey: "",
   fieldPipeline: null,
   reducePipeline: null,
-  shadePipeline: null,
+  backgroundPipeline: null,
+  contourPipeline: null,
+  linePipeline: null,
+  lineUnionPipeline: null,
+  blurPipeline: null,
   sharpAtlasTexture: null,
   blurredAtlasTexture: null,
   ditherTexture: null,
@@ -320,7 +581,18 @@ const webGpuState = {
   modeStateBuffer: null,
   fieldParamsBuffer: null,
   reduceParamsBuffer: null,
-  shadeParamsBuffer: null,
+  backgroundParamsBuffer: null,
+  contourParamsBuffer: null,
+  lineParamsBuffers: [],
+  blurParamsBuffers: [],
+  segmentBuffer: null,
+  glowSourceTexture: null,
+  glowSourceView: null,
+  glowBlurTexture: null,
+  glowBlurView: null,
+  glowTargetWidth: 0,
+  glowTargetHeight: 0,
+  linearSampler: null,
   dirtyContextConfig: true,
 };
 
@@ -369,6 +641,26 @@ function createFieldTextures() {
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
   });
   webGpuState.colorWeightView = webGpuState.colorWeightTexture.createView();
+}
+
+function createPresentationTextures() {
+  const targetWidth = Math.min(PRESENTATION_MAX_SIZE, Math.max(1, Math.round(wgpuCanvas.width * PRESENTATION_SUPERSAMPLE)));
+  const targetHeight = Math.min(PRESENTATION_MAX_SIZE, Math.max(1, Math.round(wgpuCanvas.height * PRESENTATION_SUPERSAMPLE)));
+  webGpuState.glowTargetWidth = targetWidth;
+  webGpuState.glowTargetHeight = targetHeight;
+  webGpuState.glowSourceTexture = webGpuState.device.createTexture({
+    size: [targetWidth, targetHeight],
+    format: webGpuState.canvasFormat,
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+  });
+  webGpuState.glowSourceView = webGpuState.glowSourceTexture.createView();
+
+  webGpuState.glowBlurTexture = webGpuState.device.createTexture({
+    size: [targetWidth, targetHeight],
+    format: webGpuState.canvasFormat,
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+  });
+  webGpuState.glowBlurView = webGpuState.glowBlurTexture.createView();
 }
 
 function buildReductionChain() {
@@ -421,22 +713,48 @@ function createStaticTextures() {
     size: 16,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
-  webGpuState.shadeParamsBuffer = webGpuState.device.createBuffer({
-    size: 13 * 16,
+  webGpuState.backgroundParamsBuffer = webGpuState.device.createBuffer({
+    size: 9 * 16,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+  webGpuState.contourParamsBuffer = webGpuState.device.createBuffer({
+    size: 16,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+  webGpuState.lineParamsBuffers = Array.from({ length: 4 }, () => webGpuState.device.createBuffer({
+    size: 4 * 16,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  }));
+  webGpuState.blurParamsBuffers = Array.from({ length: 5 }, () => webGpuState.device.createBuffer({
+    size: 2 * 16,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  }));
+  webGpuState.segmentBuffer = webGpuState.device.createBuffer({
+    size: MAX_CONTOUR_SEGMENTS * SEGMENT_STRIDE_BYTES,
+    usage: GPUBufferUsage.STORAGE,
+  });
+  webGpuState.linearSampler = webGpuState.device.createSampler({
+    magFilter: "linear",
+    minFilter: "linear",
+    mipmapFilter: "linear",
+    addressModeU: "clamp-to-edge",
+    addressModeV: "clamp-to-edge",
   });
 }
 
 function createPipelines() {
-  const vertexModule = createShaderModule(FULLSCREEN_VERTEX_SHADER);
+  const fullscreenVertexModule = createShaderModule(FULLSCREEN_VERTEX_SHADER);
   const fieldModule = createShaderModule(FIELD_SHADER);
   const reduceModule = createShaderModule(REDUCE_SHADER);
-  const shadeModule = createShaderModule(SHADE_SHADER);
+  const backgroundModule = createShaderModule(BACKGROUND_SHADER);
+  const contourModule = createShaderModule(CONTOUR_COMPUTE_SHADER);
+  const segmentModule = createShaderModule(SEGMENT_RENDER_SHADER);
+  const blurModule = createShaderModule(BLUR_SHADER);
 
   webGpuState.fieldPipeline = webGpuState.device.createRenderPipeline({
     layout: "auto",
     vertex: {
-      module: vertexModule,
+      module: fullscreenVertexModule,
       entryPoint: "main",
     },
     fragment: {
@@ -456,7 +774,7 @@ function createPipelines() {
   webGpuState.reducePipeline = webGpuState.device.createRenderPipeline({
     layout: "auto",
     vertex: {
-      module: vertexModule,
+      module: fullscreenVertexModule,
       entryPoint: "main",
     },
     fragment: {
@@ -469,16 +787,120 @@ function createPipelines() {
     },
   });
 
-  webGpuState.shadePipeline = webGpuState.device.createRenderPipeline({
+  webGpuState.backgroundPipeline = webGpuState.device.createRenderPipeline({
     layout: "auto",
     vertex: {
-      module: vertexModule,
+      module: fullscreenVertexModule,
       entryPoint: "main",
     },
     fragment: {
-      module: shadeModule,
+      module: backgroundModule,
       entryPoint: "main",
       targets: [{ format: webGpuState.canvasFormat }],
+    },
+    primitive: {
+      topology: "triangle-list",
+    },
+  });
+
+  webGpuState.contourPipeline = webGpuState.device.createComputePipeline({
+    layout: "auto",
+    compute: {
+      module: contourModule,
+      entryPoint: "main",
+    },
+  });
+
+  webGpuState.linePipeline = webGpuState.device.createRenderPipeline({
+    layout: "auto",
+    vertex: {
+      module: segmentModule,
+      entryPoint: "vsMain",
+    },
+    fragment: {
+      module: segmentModule,
+      entryPoint: "fsMain",
+      targets: [
+        {
+          format: webGpuState.canvasFormat,
+          blend: {
+            color: {
+              srcFactor: "src-alpha",
+              dstFactor: "one-minus-src-alpha",
+              operation: "add",
+            },
+            alpha: {
+              srcFactor: "one",
+              dstFactor: "one-minus-src-alpha",
+              operation: "add",
+            },
+          },
+        },
+      ],
+    },
+    primitive: {
+      topology: "triangle-list",
+    },
+  });
+
+  webGpuState.lineUnionPipeline = webGpuState.device.createRenderPipeline({
+    layout: "auto",
+    vertex: {
+      module: segmentModule,
+      entryPoint: "vsMain",
+    },
+    fragment: {
+      module: segmentModule,
+      entryPoint: "fsMain",
+      targets: [
+        {
+          format: webGpuState.canvasFormat,
+          blend: {
+            color: {
+              srcFactor: "one",
+              dstFactor: "one",
+              operation: "max",
+            },
+            alpha: {
+              srcFactor: "one",
+              dstFactor: "one",
+              operation: "max",
+            },
+          },
+        },
+      ],
+    },
+    primitive: {
+      topology: "triangle-list",
+    },
+  });
+
+  webGpuState.blurPipeline = webGpuState.device.createRenderPipeline({
+    layout: "auto",
+    vertex: {
+      module: blurModule,
+      entryPoint: "vsMain",
+    },
+    fragment: {
+      module: blurModule,
+      entryPoint: "fsMain",
+      targets: [
+        {
+          format: webGpuState.canvasFormat,
+          blend: {
+            color: {
+              srcFactor: "one",
+              dstFactor: "one-minus-src-alpha",
+              operation: "add",
+            },
+            alpha: {
+              srcFactor: "one",
+              dstFactor: "one-minus-src-alpha",
+              operation: "add",
+            },
+          },
+        },
+      ],
     },
     primitive: {
       topology: "triangle-list",
@@ -515,6 +937,7 @@ function ensureCanvasConfigured() {
     format: webGpuState.canvasFormat,
     alphaMode: "opaque",
   });
+  createPresentationTextures();
   webGpuState.currentCanvasSize = sizeKey;
   webGpuState.dirtyContextConfig = false;
   return true;
@@ -617,13 +1040,16 @@ function uploadModeState(modeRenderState) {
 function encodeFieldPass(encoder, spatialAtlas, modeRenderState, isSingleMode, useGlowColor) {
   uploadSpatialAtlas(spatialAtlas);
   uploadModeState(modeRenderState);
-  const fieldParams = new Uint32Array([
-    state.modeState.length,
-    isSingleMode ? 1 : 0,
-    state.combineMode === "signed" ? 1 : 0,
-    useGlowColor ? 1 : 0,
-  ]);
-  webGpuState.device.queue.writeBuffer(webGpuState.fieldParamsBuffer, 0, fieldParams);
+  webGpuState.device.queue.writeBuffer(
+    webGpuState.fieldParamsBuffer,
+    0,
+    new Uint32Array([
+      state.modeState.length,
+      isSingleMode ? 1 : 0,
+      state.combineMode === "signed" ? 1 : 0,
+      useGlowColor ? 1 : 0,
+    ]),
+  );
 
   const bindGroup = webGpuState.device.createBindGroup({
     layout: webGpuState.fieldPipeline.getBindGroupLayout(0),
@@ -701,91 +1127,263 @@ function encodeReductionPasses(encoder) {
   }
 }
 
-function encodeShadePass(encoder, params) {
-  const {
-    rms,
-    centroid,
-    contrast,
-    coreSharpness,
-    haloSharpness,
-    lineWeight,
-    haloWeight,
-    backgroundWeight,
-    singleAmpGate,
-    separation,
-    renderAsDormantField,
-    useGlowColor,
-    themePalette,
-    glowColor,
-    isSingleMode,
-  } = params;
-
-  const styleMode = state.renderStyle === "isoline" ? 1 : 0;
-  const renderFlags = new Float32Array([
-    isSingleMode ? 1 : 0,
-    state.plateShape === "circle" ? 1 : 0,
-    atmosphereEnabledInput.checked ? 1 : 0,
-    renderAsDormantField ? 1 : 0,
-  ]);
-  const extras = new Float32Array([
-    contrast,
-    useGlowColor ? 1 : 0,
-    styleMode,
-    separation,
-  ]);
-  const shadeParams = new Float32Array([
-    wgpuCanvas.width, wgpuCanvas.height, centroid, rms,
-    lineWeight, haloWeight, singleAmpGate, coreSharpness,
-    haloSharpness, numericControls.glowThickness, numericControls.glowSpread, backgroundWeight,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    BASE_BG_COLOR[0], BASE_BG_COLOR[1], BASE_BG_COLOR[2], 0,
-    themePalette.backdropColor[0], themePalette.backdropColor[1], themePalette.backdropColor[2], 0,
-    themePalette.baseColor[0], themePalette.baseColor[1], themePalette.baseColor[2], 0,
-    themePalette.lineColor[0], themePalette.lineColor[1], themePalette.lineColor[2], 0,
-    themePalette.outerColor[0], themePalette.outerColor[1], themePalette.outerColor[2], 0,
-    glowColor[0], glowColor[1], glowColor[2], 0,
-    themePalette.atmosphereCore[0], themePalette.atmosphereCore[1], themePalette.atmosphereCore[2], 0,
-    themePalette.atmosphereOuter[0], themePalette.atmosphereOuter[1], themePalette.atmosphereOuter[2], 0,
-  ]);
-  shadeParams.set(renderFlags, 12);
-  shadeParams.set(extras, 16);
-  webGpuState.device.queue.writeBuffer(webGpuState.shadeParamsBuffer, 0, shadeParams);
-
-  const reductionView = webGpuState.reductionChain[webGpuState.reductionChain.length - 1]?.view ?? webGpuState.fieldView;
+function encodeContourPass(encoder) {
+  webGpuState.device.queue.writeBuffer(
+    webGpuState.contourParamsBuffer,
+    0,
+    new Uint32Array([state.plateShape === "circle" ? 1 : 0, 0, 0, 0]),
+  );
   const bindGroup = webGpuState.device.createBindGroup({
-    layout: webGpuState.shadePipeline.getBindGroupLayout(0),
+    layout: webGpuState.contourPipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: webGpuState.fieldView },
+      { binding: 1, resource: { buffer: webGpuState.segmentBuffer } },
+      { binding: 2, resource: { buffer: webGpuState.contourParamsBuffer } },
+    ],
+  });
+  const pass = encoder.beginComputePass();
+  pass.setPipeline(webGpuState.contourPipeline);
+  pass.setBindGroup(0, bindGroup);
+  pass.dispatchWorkgroups(Math.ceil(FIELD_STRIDE / 8), Math.ceil(FIELD_STRIDE / 8), 1);
+  pass.end();
+}
+
+function encodeBackgroundPass(encoder, targetView, params) {
+  const reductionView = webGpuState.reductionChain[webGpuState.reductionChain.length - 1]?.view ?? webGpuState.fieldView;
+  const backgroundParams = new Float32Array([
+    wgpuCanvas.width, wgpuCanvas.height, params.centroid, params.rms,
+    params.haloSharpness, params.backgroundWeight, params.contrast, params.singleAmpGate,
+    params.isSingleMode ? 1 : 0, state.plateShape === "circle" ? 1 : 0, atmosphereEnabledInput.checked ? 1 : 0, params.renderAsDormantField ? 1 : 0,
+    BASE_BG_COLOR[0], BASE_BG_COLOR[1], BASE_BG_COLOR[2], 0,
+    params.themePalette.backdropColor[0], params.themePalette.backdropColor[1], params.themePalette.backdropColor[2], 0,
+    params.themePalette.baseColor[0], params.themePalette.baseColor[1], params.themePalette.baseColor[2], 0,
+    params.themePalette.outerColor[0], params.themePalette.outerColor[1], params.themePalette.outerColor[2], 0,
+    params.themePalette.atmosphereCore[0], params.themePalette.atmosphereCore[1], params.themePalette.atmosphereCore[2], 0,
+    params.themePalette.atmosphereOuter[0], params.themePalette.atmosphereOuter[1], params.themePalette.atmosphereOuter[2], 0,
+  ]);
+  webGpuState.device.queue.writeBuffer(webGpuState.backgroundParamsBuffer, 0, backgroundParams);
+
+  const bindGroup = webGpuState.device.createBindGroup({
+    layout: webGpuState.backgroundPipeline.getBindGroupLayout(0),
     entries: [
       { binding: 0, resource: webGpuState.fieldView },
       { binding: 1, resource: webGpuState.colorAccumView },
       { binding: 2, resource: webGpuState.colorWeightView },
       { binding: 3, resource: reductionView },
       { binding: 4, resource: webGpuState.ditherTexture.createView() },
-      { binding: 5, resource: { buffer: webGpuState.shadeParamsBuffer } },
+      { binding: 5, resource: { buffer: webGpuState.backgroundParamsBuffer } },
     ],
   });
 
-  const targetView = webGpuState.context.getCurrentTexture().createView();
   const pass = encoder.beginRenderPass({
     colorAttachments: [
       {
         view: targetView,
-        clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        clearValue: {
+          r: BASE_BG_COLOR[0] / 255,
+          g: BASE_BG_COLOR[1] / 255,
+          b: BASE_BG_COLOR[2] / 255,
+          a: 1,
+        },
         loadOp: "clear",
         storeOp: "store",
       },
     ],
   });
-  pass.setPipeline(webGpuState.shadePipeline);
+  pass.setPipeline(webGpuState.backgroundPipeline);
   pass.setBindGroup(0, bindGroup);
   pass.draw(3, 1, 0, 0);
   pass.end();
+}
+
+function buildTargetMetrics(targetWidth, targetHeight) {
+  const inset = targetWidth * 0.09;
+  return {
+    width: targetWidth,
+    height: targetHeight,
+    inset,
+    drawSize: targetWidth - inset * 2,
+    scale: targetWidth / Math.max(1, wgpuCanvas.width),
+  };
+}
+
+function encodeLinePass(encoder, targetView, metrics, bufferIndex, color, lineWidth, blurRadius, alpha, crisp, loadOp = "load", pipeline = webGpuState.linePipeline) {
+  const lineParamsBuffer = webGpuState.lineParamsBuffers[bufferIndex];
+  const lineParams = new Float32Array([
+    metrics.width, metrics.height, metrics.inset, metrics.drawSize,
+    lineWidth * metrics.scale, blurRadius * metrics.scale, alpha, 0,
+    color[0], color[1], color[2], 0,
+    state.plateShape === "circle" ? 1 : 0, crisp ? 1 : 0, 0, 0,
+  ]);
+  webGpuState.device.queue.writeBuffer(lineParamsBuffer, 0, lineParams);
+
+  const bindGroup = webGpuState.device.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: webGpuState.segmentBuffer } },
+      { binding: 1, resource: { buffer: lineParamsBuffer } },
+    ],
+  });
+
+  const pass = encoder.beginRenderPass({
+    colorAttachments: [
+      {
+        view: targetView,
+        clearValue: { r: 0, g: 0, b: 0, a: 0 },
+        loadOp,
+        storeOp: "store",
+      },
+    ],
+  });
+  pass.setPipeline(pipeline);
+  pass.setBindGroup(0, bindGroup);
+  pass.draw(6, MAX_CONTOUR_SEGMENTS, 0, 0);
+  pass.end();
+}
+
+function encodeBlurPass(encoder, sourceView, targetView, sourceWidth, sourceHeight, bufferIndex, direction, sigma, opacity, loadOp = "load") {
+  const blurParamsBuffer = webGpuState.blurParamsBuffers[bufferIndex];
+  const resolvedSigma = Math.max(sigma * 0.68, 0.18);
+  const blurParams = new Float32Array([
+    sourceWidth, sourceHeight, 0, 0,
+    direction[0], direction[1], resolvedSigma, opacity,
+  ]);
+  webGpuState.device.queue.writeBuffer(blurParamsBuffer, 0, blurParams);
+
+  const bindGroup = webGpuState.device.createBindGroup({
+    layout: webGpuState.blurPipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: webGpuState.linearSampler },
+      { binding: 1, resource: sourceView },
+      { binding: 2, resource: { buffer: blurParamsBuffer } },
+    ],
+  });
+
+  const pass = encoder.beginRenderPass({
+    colorAttachments: [
+      {
+        view: targetView,
+        clearValue: { r: 0, g: 0, b: 0, a: 0 },
+        loadOp,
+        storeOp: "store",
+      },
+    ],
+  });
+  pass.setPipeline(webGpuState.blurPipeline);
+  pass.setBindGroup(0, bindGroup);
+  pass.draw(3, 1, 0, 0);
+  pass.end();
+}
+
+function renderGlowContours(encoder, targetView, params) {
+  const alpha = Math.max(0.1, params.singleAmpGate);
+  const thickness = numericControls.glowThickness;
+  const spread = numericControls.glowSpread;
+  const intensity = numericControls.glowIntensity * 1.2;
+  const separation = numericControls.colorSeparation;
+  const glowSpread = Math.pow(spread, 0.7);
+  const glowAlphaScale = 1 / Math.pow(thickness, 0.18);
+  const offscreenMetrics = buildTargetMetrics(webGpuState.glowTargetWidth, webGpuState.glowTargetHeight);
+  const outerGlowColor = lerpColor(params.themePalette.outerColor, params.glowColor, clamp(0.72 + separation * 0.12, 0, 1));
+  const innerGlowColor = lerpColor(params.themePalette.baseColor, params.glowColor, clamp(0.9 + separation * 0.08, 0, 1));
+  const lineColor = lerpColor(params.themePalette.baseColor, params.glowColor, 1);
+  const outerCompositeOpacity = 0.48 * intensity;
+  const innerCompositeOpacity = 0.42 * intensity;
+  const outerLineWidth = (10 + alpha * 8) * (0.9 + thickness * 0.42);
+  const innerLineWidth = (4.4 + alpha * 2.4) * (0.92 + thickness * 0.32);
+  const crispLineWidth = (2.4 + alpha * 1.6) * (0.8 + thickness * 0.34) * 0.92;
+  const outerBlur = (12 + alpha * 12) * glowSpread;
+  const innerBlur = (3.5 + alpha * 3.2) * glowSpread;
+  const outerAlpha = (0.08 + alpha * 0.09) * glowAlphaScale * 1.02 * intensity;
+  const innerAlpha = (0.10 + alpha * 0.11) * glowAlphaScale * 0.94 * intensity;
+
+  encodeLinePass(
+    encoder,
+    webGpuState.glowSourceView,
+    offscreenMetrics,
+    0,
+    outerGlowColor,
+    outerLineWidth,
+    0,
+    outerAlpha,
+    true,
+    "clear",
+    webGpuState.lineUnionPipeline,
+  );
+  encodeBlurPass(encoder, webGpuState.glowSourceView, webGpuState.glowBlurView, webGpuState.glowTargetWidth, webGpuState.glowTargetHeight, 0, [1, 0], outerBlur * offscreenMetrics.scale, 1, "clear");
+  encodeBlurPass(encoder, webGpuState.glowBlurView, targetView, webGpuState.glowTargetWidth, webGpuState.glowTargetHeight, 1, [0, 1], outerBlur * offscreenMetrics.scale, outerCompositeOpacity, "load");
+
+  encodeLinePass(
+    encoder,
+    webGpuState.glowSourceView,
+    offscreenMetrics,
+    1,
+    innerGlowColor,
+    innerLineWidth,
+    0,
+    innerAlpha,
+    true,
+    "clear",
+    webGpuState.lineUnionPipeline,
+  );
+  encodeBlurPass(encoder, webGpuState.glowSourceView, webGpuState.glowBlurView, webGpuState.glowTargetWidth, webGpuState.glowTargetHeight, 2, [1, 0], innerBlur * offscreenMetrics.scale, 1, "clear");
+  encodeBlurPass(encoder, webGpuState.glowBlurView, targetView, webGpuState.glowTargetWidth, webGpuState.glowTargetHeight, 3, [0, 1], innerBlur * offscreenMetrics.scale, innerCompositeOpacity, "load");
+
+  encodeLinePass(
+    encoder,
+    webGpuState.glowSourceView,
+    offscreenMetrics,
+    2,
+    lineColor,
+    crispLineWidth,
+    0,
+    (0.32 + alpha * 0.34) * 1.15,
+    true,
+    "clear",
+    webGpuState.lineUnionPipeline,
+  );
+  encodeBlurPass(encoder, webGpuState.glowSourceView, targetView, webGpuState.glowTargetWidth, webGpuState.glowTargetHeight, 4, [0, 0], 0.001, 1, "load");
+}
+
+function renderIsolineContours(encoder, targetView, params) {
+  const thresholdAlpha = Math.max(0.12, params.singleAmpGate);
+  const lineColor = params.themePalette.lineColor;
+  const offscreenMetrics = buildTargetMetrics(webGpuState.glowTargetWidth, webGpuState.glowTargetHeight);
+  const lineWidth = 1.05 + thresholdAlpha * 0.72;
+  const lineOpacity = 0.34 + thresholdAlpha * 0.46;
+
+  encodeLinePass(
+    encoder,
+    webGpuState.glowSourceView,
+    offscreenMetrics,
+    0,
+    lineColor,
+    lineWidth,
+    0,
+    lineOpacity,
+    true,
+    "clear",
+    webGpuState.lineUnionPipeline,
+  );
+  encodeBlurPass(
+    encoder,
+    webGpuState.glowSourceView,
+    targetView,
+    webGpuState.glowTargetWidth,
+    webGpuState.glowTargetHeight,
+    0,
+    [0, 0],
+    0.001,
+    1,
+    "load",
+  );
 }
 
 function renderSignedFieldWithWebGpu(spatialAtlas, modeRenderState, params, frameProfileTools) {
   if (!webGpuState.ready || !ensureCanvasConfigured()) {
     return false;
   }
+
   try {
     const encoder = webGpuState.device.createCommandEncoder();
 
@@ -798,7 +1396,14 @@ function renderSignedFieldWithWebGpu(spatialAtlas, modeRenderState, params, fram
     frameProfileTools.profileSectionEnd(frameProfileTools.frameProfile, "webgpuReduce", profileStart);
 
     profileStart = frameProfileTools.profileSectionStart(frameProfileTools.frameProfile);
-    encodeShadePass(encoder, params);
+    const targetView = webGpuState.context.getCurrentTexture().createView();
+    encodeBackgroundPass(encoder, targetView, params);
+    encodeContourPass(encoder);
+    if (state.renderStyle === "glow") {
+      renderGlowContours(encoder, targetView, params);
+    } else {
+      renderIsolineContours(encoder, targetView, params);
+    }
     frameProfileTools.profileSectionEnd(frameProfileTools.frameProfile, "webgpuShade", profileStart);
 
     webGpuState.device.queue.submit([encoder.finish()]);

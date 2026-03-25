@@ -13,6 +13,7 @@ const atmosphereWrap = document.getElementById("atmosphereWrap");
 const atmosphereEnabledInput = document.getElementById("atmosphereEnabled");
 const glowThicknessWrap = document.getElementById("glowThicknessWrap");
 const glowSpreadWrap = document.getElementById("glowSpreadWrap");
+const glowIntensityWrap = document.getElementById("glowIntensityWrap");
 const colorSeparationWrap = document.getElementById("colorSeparationWrap");
 const adaptiveColorMixWrap = document.getElementById("adaptiveColorMixWrap");
 const themeWrap = document.getElementById("themeWrap");
@@ -38,6 +39,7 @@ const singleModeIndexOutput = document.querySelector('output[for="singleModeInde
 const controlIds = [
   "glowThickness",
   "glowSpread",
+  "glowIntensity",
   "colorSeparation",
   "adaptiveColorMix",
   "angularRotation",
@@ -255,6 +257,7 @@ const state = {
   midBandColor: [...THEME_PRESETS.lab.mid],
   highBandColor: [...THEME_PRESETS.lab.high],
   currentAudioObjectUrl: null,
+  activeRenderer: "legacy",
 };
 
 const gpuShadePipeline = {
@@ -542,6 +545,7 @@ export {
   glCanvas,
   glowCanvas,
   glowCtx,
+  glowIntensityWrap,
   glowSpreadWrap,
   glowThicknessWrap,
   gpuFieldPipeline,

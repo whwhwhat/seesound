@@ -1,5 +1,6 @@
 import {
   audio,
+  atmosphereEnabledInput,
   canvas,
   combineModeSelect,
   controls,
@@ -63,6 +64,10 @@ function bindEventHandlers() {
       requestRender();
     });
   }
+
+  atmosphereEnabledInput.addEventListener("change", () => {
+    requestRender();
+  });
 
   fileInput.addEventListener("change", () => {
     const [file] = fileInput.files || [];

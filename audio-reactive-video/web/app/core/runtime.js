@@ -15,6 +15,7 @@ import {
   contrastWrap,
   controls,
   glowSpreadWrap,
+  glowIntensityWrap,
   glowThicknessWrap,
   highColorInput,
   highColorWrap,
@@ -141,6 +142,7 @@ function finishFrameProfile(frameProfile) {
   }
   const lines = [
     `profile avg (${profiler.frameCount}f)`,
+    `renderer`.padEnd(15) + ` ${state.activeRenderer}`,
     `mode`.padEnd(15) + ` ${rendererFlags.directGpuPresentation ? "direct-gpu" : "stable"}`,
     `limit`.padEnd(15) + ` ${state.frameRateLimit === "auto" ? "auto" : "60 fps"}`,
     `fps`.padEnd(15) + ` ${profiler.fps.toFixed(1)}`,
@@ -248,6 +250,7 @@ function syncControlVisibility() {
   atmosphereWrap.classList.toggle("is-hidden", false);
   glowThicknessWrap.classList.toggle("is-hidden", !isGlow);
   glowSpreadWrap.classList.toggle("is-hidden", !isGlow);
+  glowIntensityWrap.classList.toggle("is-hidden", !isGlow);
   colorSeparationWrap.classList.toggle("is-hidden", !isGlow);
   adaptiveColorMixWrap.classList.toggle("is-hidden", !isGlow);
   themeWrap.classList.toggle("is-hidden", !isGlow);

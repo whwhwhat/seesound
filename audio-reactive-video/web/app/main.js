@@ -15,6 +15,12 @@ import {
 import {
   initializeFieldGeometry,
 } from "./core/geometry.js";
+import {
+  primeWebGpuRenderer,
+} from "./render/webgpu.js";
+import {
+  requestRender,
+} from "./render/renderer.js";
 
 initializeFieldGeometry();
 syncThemeInputs();
@@ -24,3 +30,8 @@ updateModeLabel();
 syncControlVisibility();
 bindEventHandlers();
 window.dispatchEvent(new Event("resize"));
+primeWebGpuRenderer().then((ready) => {
+  if (ready) {
+    requestRender();
+  }
+});

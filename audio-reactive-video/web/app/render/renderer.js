@@ -51,6 +51,10 @@ import {
   validateGpuFieldAgainstCpu,
 } from "./gpu.js";
 import {
+  clearWebGpuPresentation,
+  renderSignedFieldWithWebGpu,
+} from "./webgpu.js";
+import {
   clamp,
   lerp,
   lerpColor,
@@ -269,11 +273,6 @@ function renderField() {
 
   const spatialAtlas = ensureSpatialAtlas();
   const modeRenderState = buildModeRenderState(sampleRate, themePalette, singleModeIndex, isSingleMode);
-  profileStart = profileSectionStart(frameProfile);
-  const didAccumulateOnGpu = shouldAttemptGpuField
-    ? runGpuFieldAccumulation(spatialAtlas, modeRenderState, isSingleMode, useGlowColor)
-    : false;
-  profileSectionEnd(frameProfile, "gpuAccumulate", profileStart);
 
   for (let index = 0; index < state.modeState.length; index += 1) {
     if (modeRenderState.enabled[index] === 0) {
@@ -290,6 +289,80 @@ function renderField() {
       sceneColorAccum[2] += modeRenderState.color[index * 3 + 2] * sceneWeight;
     }
   }
+
+  const singleAmpGate = isSingleMode ? Math.min(1, activeSingleAmp * 1.6) : 1;
+  const singleAmpFloor = isSingleMode ? 0.0015 : 0;
+  const renderAsDormantSingle = isSingleMode && activeSingleAmp < singleAmpFloor;
+  const renderAsDormantField = renderAsDormantScene || renderAsDormantSingle;
+  const singleFocus = isSingleMode ? Math.max(0, Math.min(1, singleAmpGate)) : 1;
+  const coreSharpness = isSingleMode
+    ? (3 + singleFocus * 27) * nodalFocus
+    : 26 * nodalFocus;
+  const haloSharpness = isSingleMode
+    ? (0.8 + singleFocus * 7.2) * nodalFocus
+    : 8 * nodalFocus;
+  const lineWeight = isSingleMode
+    ? 0.04 + singleFocus * 1.78
+    : 0.55;
+  const haloWeight = isSingleMode
+    ? 0.62 - singleFocus * 0.34
+    : 0.18;
+  const backgroundWeight = isSingleMode
+    ? 0.03 + (1 - singleFocus) * 0.18
+    : 0.12;
+  const singleModeBlur = isSingleMode ? (1 - singleFocus) * 12 : 0;
+  const averageGlowColor =
+    sceneColorWeight > 1e-6
+      ? [
+        sceneColorAccum[0] / sceneColorWeight,
+        sceneColorAccum[1] / sceneColorWeight,
+        sceneColorAccum[2] / sceneColorWeight,
+      ]
+      : themePalette.baseColor;
+  const separation = numericControls.colorSeparation;
+  const glowColor = lerpColor(themePalette.baseColor, averageGlowColor, clamp(0.78 + separation * 0.14, 0, 1));
+
+  const usedWebGpuMainPath =
+    isSignedMode &&
+    renderSignedFieldWithWebGpu(
+      spatialAtlas,
+      modeRenderState,
+      {
+        rms,
+        centroid,
+        contrast,
+        coreSharpness,
+        haloSharpness,
+        lineWeight,
+        haloWeight,
+        backgroundWeight,
+        singleAmpGate,
+        separation,
+        renderAsDormantField,
+        useGlowColor,
+        themePalette,
+        glowColor,
+        isSingleMode,
+      },
+      {
+        frameProfile,
+        profileSectionStart,
+        profileSectionEnd,
+      },
+    );
+  if (usedWebGpuMainPath) {
+    clearGpuPresentation();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    finishFrameProfile(frameProfile);
+    return;
+  }
+  clearWebGpuPresentation();
+
+  profileStart = profileSectionStart(frameProfile);
+  const didAccumulateOnGpu = shouldAttemptGpuField
+    ? runGpuFieldAccumulation(spatialAtlas, modeRenderState, isSingleMode, useGlowColor)
+    : false;
+  profileSectionEnd(frameProfile, "gpuAccumulate", profileStart);
 
   let hasCpuFieldData = false;
   let hasCpuGlowAccumulation = false;
@@ -379,37 +452,6 @@ function renderField() {
     profileSectionEnd(frameProfile, "fieldPost", profileStart);
   }
 
-  const singleAmpGate = isSingleMode ? Math.min(1, activeSingleAmp * 1.6) : 1;
-  const singleAmpFloor = isSingleMode ? 0.0015 : 0;
-  const renderAsDormantSingle = isSingleMode && activeSingleAmp < singleAmpFloor;
-  const renderAsDormantField = renderAsDormantScene || renderAsDormantSingle;
-  const singleFocus = isSingleMode ? Math.max(0, Math.min(1, singleAmpGate)) : 1;
-  const coreSharpness = isSingleMode
-    ? (3 + singleFocus * 27) * nodalFocus
-    : 26 * nodalFocus;
-  const haloSharpness = isSingleMode
-    ? (0.8 + singleFocus * 7.2) * nodalFocus
-    : 8 * nodalFocus;
-  const lineWeight = isSingleMode
-    ? 0.04 + singleFocus * 1.78
-    : 0.55;
-  const haloWeight = isSingleMode
-    ? 0.62 - singleFocus * 0.34
-    : 0.18;
-  const backgroundWeight = isSingleMode
-    ? 0.03 + (1 - singleFocus) * 0.18
-    : 0.12;
-  const singleModeBlur = isSingleMode ? (1 - singleFocus) * 12 : 0;
-  const averageGlowColor =
-    sceneColorWeight > 1e-6
-      ? [
-        sceneColorAccum[0] / sceneColorWeight,
-        sceneColorAccum[1] / sceneColorWeight,
-        sceneColorAccum[2] / sceneColorWeight,
-      ]
-      : themePalette.baseColor;
-  const separation = numericControls.colorSeparation;
-  const glowColor = lerpColor(themePalette.baseColor, averageGlowColor, clamp(0.78 + separation * 0.14, 0, 1));
   let useDirectGpuPresentation = false;
   let displayScale = 1;
 

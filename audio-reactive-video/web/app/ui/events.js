@@ -18,6 +18,7 @@ import {
   state,
   statusNode,
   themeSelect,
+  wgpuCanvas,
   writeDirectGpuPreference,
   glCanvas,
 } from "../state/context.js";
@@ -37,6 +38,9 @@ import {
   clearGpuPresentation,
   setGpuCanvasFrame,
 } from "../render/gpu.js";
+import {
+  handleWebGpuResize,
+} from "../render/webgpu.js";
 import {
   requestRender,
   startAnimationLoop,
@@ -254,8 +258,11 @@ function bindEventHandlers() {
     const backingSize = Math.max(512, Math.round(size * ratio));
     canvas.width = backingSize;
     canvas.height = backingSize;
+    wgpuCanvas.width = backingSize;
+    wgpuCanvas.height = backingSize;
     glCanvas.width = backingSize;
     glCanvas.height = backingSize;
+    handleWebGpuResize();
     clearGpuPresentation();
     setGpuCanvasFrame(rendererFlags.directGpuPresentation);
     requestRender();

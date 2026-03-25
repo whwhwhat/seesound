@@ -1,5 +1,6 @@
 const canvas = document.getElementById("preview");
 const ctx = canvas.getContext("2d");
+const wgpuCanvas = document.getElementById("previewWgpu");
 const glCanvas = document.getElementById("previewGl");
 const audio = document.getElementById("audio");
 const fileInput = document.getElementById("audioFile");
@@ -216,6 +217,9 @@ const profiler = {
   order: [
     "frame",
     "updateModeState",
+    "webgpuField",
+    "webgpuReduce",
+    "webgpuShade",
     "gpuAccumulate",
     "gpuShade",
     "gpuReadback",
@@ -567,6 +571,7 @@ export {
   statusNode,
   themeSelect,
   themeWrap,
+  wgpuCanvas,
   writeDirectGpuPreference,
   writeProfilePreference,
 };

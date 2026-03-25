@@ -223,6 +223,7 @@ output {
   aspect-ratio: 1;
 }
 
+#previewWgpu,
 #previewGl,
 #preview {
   position: absolute;
@@ -232,6 +233,7 @@ output {
   border-radius: 28px;
 }
 
+#previewWgpu,
 #previewGl {
   background:
     radial-gradient(circle at center, rgba(210, 245, 147, 0.02), transparent 40%),
@@ -242,6 +244,7 @@ output {
   transform-origin: center center;
 }
 
+#previewWgpu.is-visible,
 #previewGl.is-visible {
   opacity: 1;
 }

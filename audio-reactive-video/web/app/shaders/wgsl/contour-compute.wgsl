@@ -11,9 +11,17 @@ struct ContourParams {
   _pad2 : u32,
 };
 
+struct PercentileResult {
+  threshold : f32,
+  displayScale : f32,
+  enabledFlag : f32,
+  _pad1 : f32,
+};
+
 @group(0) @binding(0) var fieldTex : texture_2d<f32>;
 @group(0) @binding(1) var<storage, read_write> segments : array<Segment>;
 @group(0) @binding(2) var<uniform> params : ContourParams;
+@group(0) @binding(3) var<storage, read> percentile : PercentileResult;
 
 fn interpolatePoint(ax : f32, ay : f32, av : f32, bx : f32, by : f32, bv : f32) -> vec2f {
   let denom = bv - av;
@@ -59,10 +67,11 @@ fn main(@builtin(global_invocation_id) gid : vec3u) {
 
   let x = i32(gid.x);
   let y = i32(gid.y);
-  let tl = textureLoad(fieldTex, vec2i(x, y), 0).x;
-  let tr = textureLoad(fieldTex, vec2i(x + 1, y), 0).x;
-  let br = textureLoad(fieldTex, vec2i(x + 1, y + 1), 0).x;
-  let bl = textureLoad(fieldTex, vec2i(x, y + 1), 0).x;
+  let threshold = percentile.threshold;
+  let tl = textureLoad(fieldTex, vec2i(x, y), 0).x - threshold;
+  let tr = textureLoad(fieldTex, vec2i(x + 1, y), 0).x - threshold;
+  let br = textureLoad(fieldTex, vec2i(x + 1, y + 1), 0).x - threshold;
+  let bl = textureLoad(fieldTex, vec2i(x, y + 1), 0).x - threshold;
 
   var points : array<vec2f, 4>;
   var pointCount : u32 = 0u;

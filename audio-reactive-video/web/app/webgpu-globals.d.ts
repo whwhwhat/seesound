@@ -29,6 +29,11 @@ declare global {
   }
 
   interface GPUBuffer {}
+  interface GPUBuffer {
+    mapAsync(mode: number): Promise<void>;
+    getMappedRange(offset?: number, size?: number): ArrayBuffer;
+    unmap(): void;
+  }
 
   interface GPUSampler {}
 
@@ -57,6 +62,8 @@ declare global {
       dispatchWorkgroups(x: number, y?: number, z?: number): void;
       end(): void;
     };
+    copyTextureToBuffer(source: object, destination: object, copySize: object): void;
+    copyBufferToBuffer(source: GPUBuffer, sourceOffset: number, destination: GPUBuffer, destinationOffset: number, size: number): void;
     finish(): object;
   }
 
@@ -71,11 +78,17 @@ declare global {
     RENDER_ATTACHMENT: number;
     TEXTURE_BINDING: number;
     COPY_DST: number;
+    COPY_SRC: number;
   };
   const GPUBufferUsage: {
     STORAGE: number;
     COPY_DST: number;
+    COPY_SRC: number;
     UNIFORM: number;
+    MAP_READ: number;
+  };
+  const GPUMapMode: {
+    READ: number;
   };
 }
 

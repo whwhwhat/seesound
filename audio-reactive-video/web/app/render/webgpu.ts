@@ -11,11 +11,17 @@ import {
   clamp,
   lerpColor,
 } from "../core/utils";
+import {
+  percentileOfField,
+} from "../core/geometry";
 import BACKGROUND_SHADER from "../shaders/wgsl/background.wgsl?raw";
 import BLUR_SHADER from "../shaders/wgsl/blur.wgsl?raw";
 import CONTOUR_COMPUTE_SHADER from "../shaders/wgsl/contour-compute.wgsl?raw";
 import FIELD_SHADER from "../shaders/wgsl/field.wgsl?raw";
 import FULLSCREEN_VERTEX_SHADER from "../shaders/wgsl/fullscreen-vertex.wgsl?raw";
+import PERCENTILE_HISTOGRAM_SHADER from "../shaders/wgsl/percentile-histogram.wgsl?raw";
+import PERCENTILE_MAX_SHADER from "../shaders/wgsl/percentile-max.wgsl?raw";
+import PERCENTILE_RESOLVE_SHADER from "../shaders/wgsl/percentile-resolve.wgsl?raw";
 import REDUCE_SHADER from "../shaders/wgsl/reduce.wgsl?raw";
 import SEGMENT_RENDER_SHADER from "../shaders/wgsl/segment-render.wgsl?raw";
 import type {
@@ -29,16 +35,22 @@ import type {
   RGBColor,
   ThemeGlowPalette,
 } from "../types";
+import {
+  profiler,
+} from "../state/runtime-state";
 
 const MAX_MODES = 48;
 const FIELD_STRIDE = fieldSize - 1;
 const MAX_CONTOUR_SEGMENTS = FIELD_STRIDE * FIELD_STRIDE * 2;
 const SEGMENT_STRIDE_BYTES = 32;
+const PERCENTILE_BIN_COUNT = 4096;
+const PERCENTILE_DEBUG_INTERVAL = 45;
 const WEBGPU_FIELD_FORMAT = "rgba16float";
 const WEBGPU_ATLAS_FORMAT = "r32float";
 const WEBGPU_DITHER_FORMAT = "r32float";
 const PRESENTATION_SUPERSAMPLE = 2;
 const PRESENTATION_MAX_SIZE = 2048;
+const percentileDebugFieldScratch = new Float32Array(fieldSize * fieldSize);
 
 const webGpuState: WebGpuState = {
   adapter: null,
@@ -52,6 +64,9 @@ const webGpuState: WebGpuState = {
   uploadedAtlasKey: "",
   fieldPipeline: null,
   reducePipeline: null,
+  percentileMaxPipeline: null,
+  percentileHistogramPipeline: null,
+  percentileResolvePipeline: null,
   backgroundPipeline: null,
   contourPipeline: null,
   linePipeline: null,
@@ -70,6 +85,13 @@ const webGpuState: WebGpuState = {
   modeStateBuffer: null,
   fieldParamsBuffer: null,
   reduceParamsBuffer: null,
+  percentileParamsBuffer: null,
+  percentileHistogramBuffer: null,
+  percentileResultBuffer: null,
+  percentileMaxFieldBuffer: null,
+  percentileDebugBuffer: null,
+  percentileDebugPending: false,
+  percentileDebugFrame: 0,
   backgroundParamsBuffer: null,
   contourParamsBuffer: null,
   lineParamsBuffers: [],
@@ -106,6 +128,9 @@ function requireInitializedWebGpuState(): InitializedWebGpuState {
     !webGpuState.context ||
     !webGpuState.fieldPipeline ||
     !webGpuState.reducePipeline ||
+    !webGpuState.percentileMaxPipeline ||
+    !webGpuState.percentileHistogramPipeline ||
+    !webGpuState.percentileResolvePipeline ||
     !webGpuState.backgroundPipeline ||
     !webGpuState.contourPipeline ||
     !webGpuState.linePipeline ||
@@ -123,6 +148,11 @@ function requireInitializedWebGpuState(): InitializedWebGpuState {
     !webGpuState.modeStateBuffer ||
     !webGpuState.fieldParamsBuffer ||
     !webGpuState.reduceParamsBuffer ||
+    !webGpuState.percentileParamsBuffer ||
+    !webGpuState.percentileHistogramBuffer ||
+    !webGpuState.percentileResultBuffer ||
+    !webGpuState.percentileMaxFieldBuffer ||
+    !webGpuState.percentileDebugBuffer ||
     !webGpuState.backgroundParamsBuffer ||
     !webGpuState.contourParamsBuffer ||
     !webGpuState.segmentBuffer ||
@@ -217,7 +247,7 @@ function buildReductionChain(): void {
     const texture = device.createTexture({
       size: [width, height],
       format: WEBGPU_FIELD_FORMAT,
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
     });
     chain.push({
       width,
@@ -258,6 +288,26 @@ function createStaticTextures(): void {
     size: 16,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
+  webGpuState.percentileParamsBuffer = device.createBuffer({
+    size: 16,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+  webGpuState.percentileHistogramBuffer = device.createBuffer({
+    size: (PERCENTILE_BIN_COUNT + 1) * 4,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  });
+  webGpuState.percentileResultBuffer = device.createBuffer({
+    size: 16,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+  });
+  webGpuState.percentileMaxFieldBuffer = device.createBuffer({
+    size: 256,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  });
+  webGpuState.percentileDebugBuffer = device.createBuffer({
+    size: 16,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+  });
   webGpuState.backgroundParamsBuffer = device.createBuffer({
     size: 9 * 16,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -292,6 +342,9 @@ function createPipelines(): void {
   const fullscreenVertexModule = createShaderModule(FULLSCREEN_VERTEX_SHADER);
   const fieldModule = createShaderModule(FIELD_SHADER);
   const reduceModule = createShaderModule(REDUCE_SHADER);
+  const percentileMaxModule = createShaderModule(PERCENTILE_MAX_SHADER);
+  const percentileHistogramModule = createShaderModule(PERCENTILE_HISTOGRAM_SHADER);
+  const percentileResolveModule = createShaderModule(PERCENTILE_RESOLVE_SHADER);
   const backgroundModule = createShaderModule(BACKGROUND_SHADER);
   const contourModule = createShaderModule(CONTOUR_COMPUTE_SHADER);
   const segmentModule = createShaderModule(SEGMENT_RENDER_SHADER);
@@ -346,6 +399,30 @@ function createPipelines(): void {
     },
     primitive: {
       topology: "triangle-list",
+    },
+  });
+
+  webGpuState.percentileMaxPipeline = device.createComputePipeline({
+    layout: "auto",
+    compute: {
+      module: percentileMaxModule,
+      entryPoint: "main",
+    },
+  });
+
+  webGpuState.percentileHistogramPipeline = device.createComputePipeline({
+    layout: "auto",
+    compute: {
+      module: percentileHistogramModule,
+      entryPoint: "main",
+    },
+  });
+
+  webGpuState.percentileResolvePipeline = device.createComputePipeline({
+    layout: "auto",
+    compute: {
+      module: percentileResolveModule,
+      entryPoint: "main",
     },
   });
 
@@ -688,6 +765,158 @@ function encodeReductionPasses(encoder: GPUCommandEncoder): void {
   }
 }
 
+function writePercentileParams(active: boolean): void {
+  const readyState = requireInitializedWebGpuState();
+  const packed = new ArrayBuffer(16);
+  const view = new DataView(packed);
+  view.setFloat32(0, state.plateShape === "circle" ? 0.74 : 0.7, true);
+  view.setUint32(4, active ? 1 : 0, true);
+  view.setUint32(8, state.plateShape === "circle" ? 1 : 0, true);
+  view.setUint32(12, 0, true);
+  requireWebGpuDevice().queue.writeBuffer(readyState.percentileParamsBuffer, 0, packed);
+}
+
+function computeCpuPercentileMetrics(
+  spatialAtlas: SpatialAtlasCache,
+  modeRenderState: ModeRenderState,
+): { threshold: number; displayScale: number } {
+  percentileDebugFieldScratch.fill(0);
+  const fieldCellCount = percentileDebugFieldScratch.length;
+  for (let index = 0; index < state.modeState.length; index += 1) {
+    if (modeRenderState.enabled[index] === 0) {
+      continue;
+    }
+    const contribution = modeRenderState.contribution[index];
+    const sharpMix = modeRenderState.sharpMix[index];
+    const blurMix = modeRenderState.blurMix[index];
+    const atlasOffset = index * fieldCellCount;
+    for (let ptr = 0; ptr < fieldCellCount; ptr += 1) {
+      const spatialValue =
+        spatialAtlas.sharp[atlasOffset + ptr] * sharpMix +
+        spatialAtlas.blurred[atlasOffset + ptr] * blurMix;
+      percentileDebugFieldScratch[ptr] += Math.abs(spatialValue * contribution);
+    }
+  }
+
+  const threshold = percentileOfField(
+    percentileDebugFieldScratch,
+    state.plateShape === "circle" ? 0.74 : 0.7,
+    state.plateShape === "circle",
+  );
+  let displayScale = 1e-6;
+  for (let ptr = 0; ptr < fieldCellCount; ptr += 1) {
+    if (state.plateShape === "circle" && fieldGeometry.circleInteriorMask[ptr] === 0) {
+      continue;
+    }
+    displayScale = Math.max(displayScale, Math.abs(percentileDebugFieldScratch[ptr] - threshold));
+  }
+  return {
+    threshold,
+    displayScale,
+  };
+}
+
+function schedulePercentileDebugReadback(
+  readyState: InitializedWebGpuState,
+  cpuMetrics: { threshold: number; displayScale: number },
+): void {
+  if (webGpuState.percentileDebugPending) {
+    return;
+  }
+  webGpuState.percentileDebugPending = true;
+  void readyState.percentileDebugBuffer.mapAsync(GPUMapMode.READ).then(() => {
+    try {
+      const values = new Float32Array(readyState.percentileDebugBuffer.getMappedRange().slice(0));
+      console.info(
+        "[percentile-debug]",
+        JSON.stringify({
+          shape: state.plateShape,
+          cpuThreshold: Number(cpuMetrics.threshold.toFixed(6)),
+          gpuThreshold: Number((values[0] ?? 0).toFixed(6)),
+          cpuDisplayScale: Number(cpuMetrics.displayScale.toFixed(6)),
+          gpuDisplayScale: Number((values[1] ?? 0).toFixed(6)),
+          gpuEnabled: Number((values[2] ?? 0).toFixed(3)),
+          gpuMaxField: Number((values[3] ?? 0).toFixed(6)),
+          diffThreshold: Number(Math.abs((values[0] ?? 0) - cpuMetrics.threshold).toFixed(6)),
+        }),
+      );
+    } finally {
+      readyState.percentileDebugBuffer.unmap();
+      webGpuState.percentileDebugPending = false;
+    }
+  }).catch((error) => {
+    console.warn("Percentile debug readback failed", error);
+    webGpuState.percentileDebugPending = false;
+  });
+}
+
+function encodePercentilePasses(encoder: GPUCommandEncoder, enabled: boolean): void {
+  const readyState = requireInitializedWebGpuState();
+
+  writePercentileParams(enabled);
+  requireWebGpuDevice().queue.writeBuffer(
+    readyState.percentileHistogramBuffer,
+    0,
+    new Uint32Array(PERCENTILE_BIN_COUNT + 1),
+  );
+  requireWebGpuDevice().queue.writeBuffer(
+    readyState.percentileResultBuffer,
+    0,
+    new Float32Array([0, 1, 0, 0]),
+  );
+  requireWebGpuDevice().queue.writeBuffer(
+    readyState.percentileMaxFieldBuffer,
+    0,
+    new Uint32Array([0, 0, 0, 0]),
+  );
+
+  if (enabled) {
+    const maxBindGroup = requireWebGpuDevice().createBindGroup({
+      layout: readyState.percentileMaxPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: readyState.fieldView },
+        { binding: 1, resource: { buffer: readyState.percentileParamsBuffer } },
+        { binding: 2, resource: { buffer: readyState.percentileMaxFieldBuffer } },
+      ],
+    });
+    const maxPass = encoder.beginComputePass();
+    maxPass.setPipeline(readyState.percentileMaxPipeline);
+    maxPass.setBindGroup(0, maxBindGroup);
+    maxPass.dispatchWorkgroups(Math.ceil(fieldSize / 8), Math.ceil(fieldSize / 8), 1);
+    maxPass.end();
+
+    const histogramBindGroup = requireWebGpuDevice().createBindGroup({
+      layout: readyState.percentileHistogramPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: readyState.fieldView },
+        { binding: 1, resource: { buffer: readyState.percentileMaxFieldBuffer } },
+        { binding: 2, resource: { buffer: readyState.percentileParamsBuffer } },
+        { binding: 3, resource: { buffer: readyState.percentileHistogramBuffer } },
+      ],
+    });
+    const histogramPass = encoder.beginComputePass();
+    histogramPass.setPipeline(readyState.percentileHistogramPipeline);
+    histogramPass.setBindGroup(0, histogramBindGroup);
+    histogramPass.dispatchWorkgroups(Math.ceil(fieldSize / 8), Math.ceil(fieldSize / 8), 1);
+    histogramPass.end();
+  }
+
+  const resolveBindGroup = requireWebGpuDevice().createBindGroup({
+    layout: readyState.percentileResolvePipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: readyState.percentileMaxFieldBuffer } },
+      { binding: 1, resource: { buffer: readyState.percentileParamsBuffer } },
+      { binding: 2, resource: { buffer: readyState.percentileHistogramBuffer } },
+      { binding: 3, resource: { buffer: readyState.percentileResultBuffer } },
+    ],
+  });
+  const resolvePass = encoder.beginComputePass();
+  resolvePass.setPipeline(readyState.percentileResolvePipeline);
+  resolvePass.setBindGroup(0, resolveBindGroup);
+  resolvePass.dispatchWorkgroups(1, 1, 1);
+  resolvePass.end();
+}
+
 function encodeContourPass(encoder: GPUCommandEncoder): void {
   const readyState = requireInitializedWebGpuState();
   requireWebGpuDevice().queue.writeBuffer(
@@ -701,6 +930,7 @@ function encodeContourPass(encoder: GPUCommandEncoder): void {
       { binding: 0, resource: readyState.fieldView },
       { binding: 1, resource: { buffer: readyState.segmentBuffer } },
       { binding: 2, resource: { buffer: readyState.contourParamsBuffer } },
+      { binding: 3, resource: { buffer: readyState.percentileResultBuffer } },
     ],
   });
   const pass = encoder.beginComputePass();
@@ -735,6 +965,7 @@ function encodeBackgroundPass(encoder: GPUCommandEncoder, targetView: GPUTexture
       { binding: 3, resource: reductionView },
       { binding: 4, resource: readyState.ditherTexture.createView() },
       { binding: 5, resource: { buffer: readyState.backgroundParamsBuffer } },
+      { binding: 6, resource: { buffer: readyState.percentileResultBuffer } },
     ],
   });
 
@@ -983,6 +1214,11 @@ function renderSignedFieldWithWebGpu(
   try {
     const readyState = requireInitializedWebGpuState();
     const encoder = readyState.device.createCommandEncoder();
+    const shouldDebugPercentile =
+      state.combineMode === "percentile" &&
+      !params.isSingleMode &&
+      (profiler.enabled || window.location.hash.includes("percentile-debug"));
+    let cpuPercentileMetrics: { threshold: number; displayScale: number } | null = null;
 
     let profileStart = frameProfileTools.profileSectionStart(frameProfileTools.frameProfile);
     encodeFieldPass(encoder, spatialAtlas, modeRenderState, params.isSingleMode, params.useGlowColor);
@@ -990,6 +1226,7 @@ function renderSignedFieldWithWebGpu(
 
     profileStart = frameProfileTools.profileSectionStart(frameProfileTools.frameProfile);
     encodeReductionPasses(encoder);
+    encodePercentilePasses(encoder, state.combineMode === "percentile" && !params.isSingleMode);
     frameProfileTools.profileSectionEnd(frameProfileTools.frameProfile, "webgpuReduce", profileStart);
 
     profileStart = frameProfileTools.profileSectionStart(frameProfileTools.frameProfile);
@@ -1001,9 +1238,25 @@ function renderSignedFieldWithWebGpu(
     } else {
       renderIsolineContours(encoder, targetView, params);
     }
+    if (shouldDebugPercentile) {
+      webGpuState.percentileDebugFrame += 1;
+      if (webGpuState.percentileDebugFrame % PERCENTILE_DEBUG_INTERVAL === 0) {
+        cpuPercentileMetrics = computeCpuPercentileMetrics(spatialAtlas, modeRenderState);
+        encoder.copyBufferToBuffer(
+          readyState.percentileResultBuffer,
+          0,
+          readyState.percentileDebugBuffer,
+          0,
+          16,
+        );
+      }
+    }
     frameProfileTools.profileSectionEnd(frameProfileTools.frameProfile, "webgpuShade", profileStart);
 
     readyState.device.queue.submit([encoder.finish()]);
+    if (cpuPercentileMetrics) {
+      schedulePercentileDebugReadback(readyState, cpuPercentileMetrics);
+    }
     setWebGpuCanvasVisible(true, state.plateShape === "circle" && state.combineMode === "signed");
     return true;
   } catch (error) {

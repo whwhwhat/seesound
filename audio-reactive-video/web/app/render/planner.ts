@@ -9,10 +9,9 @@ import type {
 const BACKEND_CAPABILITIES = {
   webgpu: {
     renderStyles: ["glow", "isoline"],
-    combineModes: ["signed"],
+    combineModes: ["signed", "percentile"],
     displayModes: ["sum", "single"],
     presentation: "native",
-    requiresSignedField: true,
   },
   legacy: {
     renderStyles: ["glow", "isoline"],

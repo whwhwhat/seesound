@@ -10,12 +10,20 @@ struct BackgroundParams {
   atmosphereOuter : vec4f,
 };
 
+struct PercentileResult {
+  threshold : f32,
+  displayScale : f32,
+  enabledFlag : f32,
+  _pad1 : f32,
+};
+
 @group(0) @binding(0) var fieldTex : texture_2d<f32>;
 @group(0) @binding(1) var colorAccumTex : texture_2d<f32>;
 @group(0) @binding(2) var colorWeightTex : texture_2d<f32>;
 @group(0) @binding(3) var maxFieldTex : texture_2d<f32>;
 @group(0) @binding(4) var ditherTex : texture_2d<f32>;
 @group(0) @binding(5) var<uniform> params : BackgroundParams;
+@group(0) @binding(6) var<storage, read> percentile : PercentileResult;
 
 fn clamp01(value : f32) -> f32 {
   return clamp(value, 0.0, 1.0);
@@ -71,14 +79,16 @@ fn main(@builtin(position) position : vec4f) -> @location(0) vec4f {
   }
 
   let fieldCoord = clamp(localUv, vec2f(0.0), vec2f(1.0)) * 383.0;
-  let field = sampleTextureBilinear(fieldTex, fieldCoord).x;
   let maxAbs = max(textureLoad(maxFieldTex, vec2i(0, 0), 0).x, 1e-6);
-  let displayScale = select(maxAbs, 1.0, params.renderFlags.x > 0.5);
+  let threshold = select(0.0, percentile.threshold, percentile.enabledFlag > 0.5);
+  let field = sampleTextureBilinear(fieldTex, fieldCoord).x - threshold;
+  let resolvedScale = select(maxAbs, max(percentile.displayScale, 1e-6), percentile.enabledFlag > 0.5);
+  let displayScale = select(resolvedScale, 1.0, params.renderFlags.x > 0.5);
   let normalizedField = field / max(displayScale, 1e-6);
   let dither = sampleTextureBilinear(ditherTex, fieldCoord).x;
 
-  let gx = textureLoad(fieldTex, min(vec2i(fieldCoord) + vec2i(1, 0), vec2i(383, 383)), 0).x - field;
-  let gy = textureLoad(fieldTex, min(vec2i(fieldCoord) + vec2i(0, 1), vec2i(383, 383)), 0).x - field;
+  let gx = textureLoad(fieldTex, min(vec2i(fieldCoord) + vec2i(1, 0), vec2i(383, 383)), 0).x - threshold - field;
+  let gy = textureLoad(fieldTex, min(vec2i(fieldCoord) + vec2i(0, 1), vec2i(383, 383)), 0).x - threshold - field;
   let gradient = min(1.0, (abs(gx) + abs(gy)) / max(displayScale, 1e-6) * 2.6);
   let centered = localUv - vec2f(0.5);
   let squareRadius = length(centered) / 0.72;

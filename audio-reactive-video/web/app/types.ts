@@ -404,6 +404,9 @@ export interface WebGpuState {
   uploadedAtlasKey: string;
   fieldPipeline: GPURenderPipeline | null;
   reducePipeline: GPURenderPipeline | null;
+  percentileMaxPipeline: GPUComputePipeline | null;
+  percentileHistogramPipeline: GPUComputePipeline | null;
+  percentileResolvePipeline: GPUComputePipeline | null;
   backgroundPipeline: GPURenderPipeline | null;
   contourPipeline: GPUComputePipeline | null;
   linePipeline: GPURenderPipeline | null;
@@ -422,6 +425,13 @@ export interface WebGpuState {
   modeStateBuffer: GPUBuffer | null;
   fieldParamsBuffer: GPUBuffer | null;
   reduceParamsBuffer: GPUBuffer | null;
+  percentileParamsBuffer: GPUBuffer | null;
+  percentileHistogramBuffer: GPUBuffer | null;
+  percentileResultBuffer: GPUBuffer | null;
+  percentileMaxFieldBuffer: GPUBuffer | null;
+  percentileDebugBuffer: GPUBuffer | null;
+  percentileDebugPending: boolean;
+  percentileDebugFrame: number;
   backgroundParamsBuffer: GPUBuffer | null;
   contourParamsBuffer: GPUBuffer | null;
   lineParamsBuffers: GPUBuffer[];
@@ -443,6 +453,9 @@ export interface InitializedWebGpuState extends WebGpuState {
   context: GPUCanvasContext;
   fieldPipeline: GPURenderPipeline;
   reducePipeline: GPURenderPipeline;
+  percentileMaxPipeline: GPUComputePipeline;
+  percentileHistogramPipeline: GPUComputePipeline;
+  percentileResolvePipeline: GPUComputePipeline;
   backgroundPipeline: GPURenderPipeline;
   contourPipeline: GPUComputePipeline;
   linePipeline: GPURenderPipeline;
@@ -460,6 +473,11 @@ export interface InitializedWebGpuState extends WebGpuState {
   modeStateBuffer: GPUBuffer;
   fieldParamsBuffer: GPUBuffer;
   reduceParamsBuffer: GPUBuffer;
+  percentileParamsBuffer: GPUBuffer;
+  percentileHistogramBuffer: GPUBuffer;
+  percentileResultBuffer: GPUBuffer;
+  percentileMaxFieldBuffer: GPUBuffer;
+  percentileDebugBuffer: GPUBuffer;
   backgroundParamsBuffer: GPUBuffer;
   contourParamsBuffer: GPUBuffer;
   segmentBuffer: GPUBuffer;

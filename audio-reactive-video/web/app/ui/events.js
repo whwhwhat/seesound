@@ -12,17 +12,19 @@ import {
   midColorInput,
   numericControls,
   plateShapeButtons,
-  profiler,
   renderStyleButtons,
-  rendererFlags,
   singleModeViewButtons,
-  state,
   statusNode,
   themeSelect,
-  wgpuCanvas,
-  writeDirectGpuPreference,
   glCanvas,
-} from "../state/context.js";
+  wgpuCanvas,
+} from "../state/dom.js";
+import {
+  profiler,
+  rendererFlags,
+  state,
+  writeDirectGpuPreference,
+} from "../state/runtime-state.js";
 import {
   applyTheme,
   buildModes,

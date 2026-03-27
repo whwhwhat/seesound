@@ -5,6 +5,8 @@ import {
   COLOR_FOCUS_LOW_HZ,
   FFT_SIZE,
   THEME_PRESETS,
+} from "../state/constants.js";
+import {
   adaptiveColorMixWrap,
   angularRotationWrap,
   atmosphereWrap,
@@ -26,17 +28,21 @@ import {
   modeLabel,
   nodalFocusWrap,
   numericControls,
-  profiler,
-  renderBuffers,
-  rendererFlags,
   singleModeIndexOutput,
   singleModeViewWrap,
   singleModeWrap,
-  state,
   themeSelect,
   themeWrap,
+} from "../state/dom.js";
+import {
+  profiler,
+  rendererFlags,
+  state,
   writeProfilePreference,
-} from "../state/context.js";
+} from "../state/runtime-state.js";
+import {
+  renderBuffers,
+} from "../state/render-resources.js";
 import {
   clamp,
   lerp,
@@ -143,7 +149,8 @@ function finishFrameProfile(frameProfile) {
   const lines = [
     `profile avg (${profiler.frameCount}f)`,
     `renderer`.padEnd(15) + ` ${state.activeRenderer}`,
-    `mode`.padEnd(15) + ` ${rendererFlags.directGpuPresentation ? "direct-gpu" : "stable"}`,
+    `presenter`.padEnd(15) + ` ${state.activePresentation}`,
+    `mode`.padEnd(15) + ` ${rendererFlags.directGpuPresentation ? "prefer-webgl" : "stable"}`,
     `limit`.padEnd(15) + ` ${state.frameRateLimit === "auto" ? "auto" : "60 fps"}`,
     `fps`.padEnd(15) + ` ${profiler.fps.toFixed(1)}`,
   ];

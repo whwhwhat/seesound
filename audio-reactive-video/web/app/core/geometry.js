@@ -2,19 +2,25 @@ import {
   BASE_BG_COLOR,
   BESSEL_ZEROS,
   FFT_SIZE,
+  fieldSize,
+} from "../state/constants.js";
+import {
+  numericControls,
+} from "../state/dom.js";
+import {
   bandRangeCache,
   directGpuUnderlayCtx,
   directGpuUnderlayImage,
   fieldCellCount,
   fieldGeometry,
-  fieldSize,
   fieldStride,
-  numericControls,
   renderBuffers,
   spatialAtlasCache,
   spatialCache,
+} from "../state/render-resources.js";
+import {
   state,
-} from "../state/context.js";
+} from "../state/runtime-state.js";
 import {
   besselJ,
   clamp,

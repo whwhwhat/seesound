@@ -10,20 +10,32 @@ import {
   fieldGeometry,
   fieldSize,
   state,
-} from "../../state/context.js";
+} from "../../state/context";
 import {
   clamp,
   lerp,
   toRgba,
-} from "../../core/utils.js";
+} from "../../core/utils";
 import {
   clearGpuPresentation,
-} from "../gpu.js";
+} from "../gpu";
 import {
   resolveDisplayScale,
-} from "../backends/legacy-backend.js";
+} from "../backends/legacy-backend";
+import type {
+  CompositeRenderState,
+  CpuPresenterState,
+  DrawHelpers,
+  FrameContext,
+  FrameProfileTools,
+  RGBColor,
+} from "../../types";
 
-function shadeFieldOnCpu(frameContext, renderState, frameProfileTools) {
+function shadeFieldOnCpu(
+  frameContext: FrameContext,
+  renderState: CpuPresenterState,
+  frameProfileTools: FrameProfileTools,
+): number {
   if (renderState.useDirectGpuPresentation) {
     return renderState.displayScale;
   }
@@ -90,7 +102,7 @@ function shadeFieldOnCpu(frameContext, renderState, frameProfileTools) {
 
       if (useGlowColor && renderState.hasCpuGlowAccumulation && colorWeight[ptr] > 1e-6) {
         const weight = colorWeight[ptr];
-        const avgColor = [
+        const avgColor: RGBColor = [
           colorAccum[ptr * 3] / weight,
           colorAccum[ptr * 3 + 1] / weight,
           colorAccum[ptr * 3 + 2] / weight,
@@ -98,12 +110,12 @@ function shadeFieldOnCpu(frameContext, renderState, frameProfileTools) {
         const monoLuma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
         const avgLuma = avgColor[0] * 0.2126 + avgColor[1] * 0.7152 + avgColor[2] * 0.0722;
         const luminanceScale = monoLuma / Math.max(avgLuma, 1);
-        const tinted = [
+        const tinted: RGBColor = [
           clamp(avgColor[0] * luminanceScale, 0, 255),
           clamp(avgColor[1] * luminanceScale, 0, 255),
           clamp(avgColor[2] * luminanceScale, 0, 255),
         ];
-        const boostedTint = [
+        const boostedTint: RGBColor = [
           clamp(tinted[0] * (0.98 - separation * 0.06), 0, 255),
           clamp(tinted[1] * (1 + separation * 0.03), 0, 255),
           clamp(tinted[2] * (1.03 + separation * 0.16), 0, 255),
@@ -131,7 +143,12 @@ function shadeFieldOnCpu(frameContext, renderState, frameProfileTools) {
   return displayScale;
 }
 
-function compositeLegacyScene(frameContext, renderState, drawHelpers, frameProfileTools) {
+function compositeLegacyScene(
+  frameContext: FrameContext,
+  renderState: CompositeRenderState,
+  drawHelpers: DrawHelpers,
+  frameProfileTools: FrameProfileTools,
+): void {
   const {
     drawAtmosphereOverlay,
     drawGlowContours,
@@ -180,7 +197,7 @@ function compositeLegacyScene(frameContext, renderState, drawHelpers, frameProfi
     drawAtmosphereOverlay(themePalette);
   }
 
-  let smoothedIsolinePath = null;
+  let smoothedIsolinePath: Path2D | null = null;
   if (hasCpuFieldData) {
     const isolineStart = frameProfileTools.profileSectionStart(frameProfileTools.frameProfile);
     smoothedIsolinePath =
@@ -190,7 +207,7 @@ function compositeLegacyScene(frameContext, renderState, drawHelpers, frameProfi
     frameProfileTools.profileSectionEnd(frameProfileTools.frameProfile, "isoline", isolineStart);
   }
 
-  if (!useDirectGpuPresentation && state.renderStyle === "glow") {
+  if (!useDirectGpuPresentation && state.renderStyle === "glow" && smoothedIsolinePath) {
     ctx.save();
     if (state.plateShape === "circle") {
       ctx.beginPath();

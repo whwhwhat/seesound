@@ -6,11 +6,22 @@ import {
   numericControls,
   state,
   wgpuCanvas,
-} from "../state/context.js";
+} from "../state/context";
 import {
   clamp,
   lerpColor,
-} from "../core/utils.js";
+} from "../core/utils";
+import type {
+  InitializedWebGpuState,
+  ModeRenderState,
+  SpatialAtlasCache,
+  WebGpuFrameProfileTools,
+  WebGpuReductionTarget,
+  WebGpuRenderParams,
+  WebGpuState,
+  RGBColor,
+  ThemeGlowPalette,
+} from "../types";
 
 const MAX_MODES = 48;
 const FIELD_STRIDE = fieldSize - 1;
@@ -551,7 +562,7 @@ fn fsMain(
 }
 `;
 
-const webGpuState = {
+const webGpuState: WebGpuState = {
   adapter: null,
   device: null,
   context: null,
@@ -596,11 +607,63 @@ const webGpuState = {
   dirtyContextConfig: true,
 };
 
-function isWebGpuSupported() {
+function requireWebGpuDevice(): GPUDevice {
+  if (!webGpuState.device) {
+    throw new Error("WebGPU device is unavailable");
+  }
+  return webGpuState.device;
+}
+
+function requireWebGpuContext(): GPUCanvasContext {
+  if (!webGpuState.context) {
+    throw new Error("WebGPU canvas context is unavailable");
+  }
+  return webGpuState.context;
+}
+
+function requireInitializedWebGpuState(): InitializedWebGpuState {
+  if (
+    !webGpuState.adapter ||
+    !webGpuState.device ||
+    !webGpuState.context ||
+    !webGpuState.fieldPipeline ||
+    !webGpuState.reducePipeline ||
+    !webGpuState.backgroundPipeline ||
+    !webGpuState.contourPipeline ||
+    !webGpuState.linePipeline ||
+    !webGpuState.lineUnionPipeline ||
+    !webGpuState.blurPipeline ||
+    !webGpuState.sharpAtlasTexture ||
+    !webGpuState.blurredAtlasTexture ||
+    !webGpuState.ditherTexture ||
+    !webGpuState.fieldTexture ||
+    !webGpuState.fieldView ||
+    !webGpuState.colorAccumTexture ||
+    !webGpuState.colorAccumView ||
+    !webGpuState.colorWeightTexture ||
+    !webGpuState.colorWeightView ||
+    !webGpuState.modeStateBuffer ||
+    !webGpuState.fieldParamsBuffer ||
+    !webGpuState.reduceParamsBuffer ||
+    !webGpuState.backgroundParamsBuffer ||
+    !webGpuState.contourParamsBuffer ||
+    !webGpuState.segmentBuffer ||
+    !webGpuState.glowSourceTexture ||
+    !webGpuState.glowSourceView ||
+    !webGpuState.glowBlurTexture ||
+    !webGpuState.glowBlurView ||
+    !webGpuState.linearSampler
+  ) {
+    throw new Error("WebGPU state is not fully initialized");
+  }
+  return webGpuState as InitializedWebGpuState;
+}
+
+function isWebGpuSupported(): boolean {
   return typeof navigator !== "undefined" && Boolean(navigator.gpu) && Boolean(wgpuCanvas);
 }
 
-function setWebGpuCanvasVisible(visible, rotateCircleSigned = false) {
+function setWebGpuCanvasVisible(visible: boolean, rotateCircleSigned = false): void {
   if (!wgpuCanvas) {
     return;
   }
@@ -608,34 +671,35 @@ function setWebGpuCanvasVisible(visible, rotateCircleSigned = false) {
   wgpuCanvas.style.transform = rotateCircleSigned ? "rotate(-90deg)" : "";
 }
 
-function handleWebGpuResize() {
+function handleWebGpuResize(): void {
   webGpuState.dirtyContextConfig = true;
 }
 
-function clearWebGpuPresentation() {
+function clearWebGpuPresentation(): void {
   setWebGpuCanvasVisible(false, false);
 }
 
-function createShaderModule(code) {
-  return webGpuState.device.createShaderModule({ code });
+function createShaderModule(code: string): GPUShaderModule {
+  return requireWebGpuDevice().createShaderModule({ code });
 }
 
-function createFieldTextures() {
-  webGpuState.fieldTexture = webGpuState.device.createTexture({
+function createFieldTextures(): void {
+  const device = requireWebGpuDevice();
+  webGpuState.fieldTexture = device.createTexture({
     size: [fieldSize, fieldSize],
     format: WEBGPU_FIELD_FORMAT,
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
   });
   webGpuState.fieldView = webGpuState.fieldTexture.createView();
 
-  webGpuState.colorAccumTexture = webGpuState.device.createTexture({
+  webGpuState.colorAccumTexture = device.createTexture({
     size: [fieldSize, fieldSize],
     format: WEBGPU_FIELD_FORMAT,
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
   });
   webGpuState.colorAccumView = webGpuState.colorAccumTexture.createView();
 
-  webGpuState.colorWeightTexture = webGpuState.device.createTexture({
+  webGpuState.colorWeightTexture = device.createTexture({
     size: [fieldSize, fieldSize],
     format: WEBGPU_FIELD_FORMAT,
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
@@ -643,19 +707,20 @@ function createFieldTextures() {
   webGpuState.colorWeightView = webGpuState.colorWeightTexture.createView();
 }
 
-function createPresentationTextures() {
+function createPresentationTextures(): void {
+  const device = requireWebGpuDevice();
   const targetWidth = Math.min(PRESENTATION_MAX_SIZE, Math.max(1, Math.round(wgpuCanvas.width * PRESENTATION_SUPERSAMPLE)));
   const targetHeight = Math.min(PRESENTATION_MAX_SIZE, Math.max(1, Math.round(wgpuCanvas.height * PRESENTATION_SUPERSAMPLE)));
   webGpuState.glowTargetWidth = targetWidth;
   webGpuState.glowTargetHeight = targetHeight;
-  webGpuState.glowSourceTexture = webGpuState.device.createTexture({
+  webGpuState.glowSourceTexture = device.createTexture({
     size: [targetWidth, targetHeight],
     format: webGpuState.canvasFormat,
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
   });
   webGpuState.glowSourceView = webGpuState.glowSourceTexture.createView();
 
-  webGpuState.glowBlurTexture = webGpuState.device.createTexture({
+  webGpuState.glowBlurTexture = device.createTexture({
     size: [targetWidth, targetHeight],
     format: webGpuState.canvasFormat,
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
@@ -663,14 +728,15 @@ function createPresentationTextures() {
   webGpuState.glowBlurView = webGpuState.glowBlurTexture.createView();
 }
 
-function buildReductionChain() {
-  const chain = [];
+function buildReductionChain(): void {
+  const device = requireWebGpuDevice();
+  const chain: WebGpuReductionTarget[] = [];
   let width = fieldSize;
   let height = fieldSize;
   while (width > 1 || height > 1) {
     width = Math.max(1, Math.ceil(width / 2));
     height = Math.max(1, Math.ceil(height / 2));
-    const texture = webGpuState.device.createTexture({
+    const texture = device.createTexture({
       size: [width, height],
       format: WEBGPU_FIELD_FORMAT,
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
@@ -685,55 +751,56 @@ function buildReductionChain() {
   webGpuState.reductionChain = chain;
 }
 
-function createStaticTextures() {
-  webGpuState.sharpAtlasTexture = webGpuState.device.createTexture({
+function createStaticTextures(): void {
+  const device = requireWebGpuDevice();
+  webGpuState.sharpAtlasTexture = device.createTexture({
     size: [fieldSize, fieldSize, MAX_MODES],
     format: WEBGPU_ATLAS_FORMAT,
     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
   });
-  webGpuState.blurredAtlasTexture = webGpuState.device.createTexture({
+  webGpuState.blurredAtlasTexture = device.createTexture({
     size: [fieldSize, fieldSize, MAX_MODES],
     format: WEBGPU_ATLAS_FORMAT,
     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
   });
-  webGpuState.ditherTexture = webGpuState.device.createTexture({
+  webGpuState.ditherTexture = device.createTexture({
     size: [fieldSize, fieldSize],
     format: WEBGPU_DITHER_FORMAT,
     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
   });
-  webGpuState.modeStateBuffer = webGpuState.device.createBuffer({
+  webGpuState.modeStateBuffer = device.createBuffer({
     size: MAX_MODES * 8 * 4,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
-  webGpuState.fieldParamsBuffer = webGpuState.device.createBuffer({
+  webGpuState.fieldParamsBuffer = device.createBuffer({
     size: 16,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
-  webGpuState.reduceParamsBuffer = webGpuState.device.createBuffer({
+  webGpuState.reduceParamsBuffer = device.createBuffer({
     size: 16,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
-  webGpuState.backgroundParamsBuffer = webGpuState.device.createBuffer({
+  webGpuState.backgroundParamsBuffer = device.createBuffer({
     size: 9 * 16,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
-  webGpuState.contourParamsBuffer = webGpuState.device.createBuffer({
+  webGpuState.contourParamsBuffer = device.createBuffer({
     size: 16,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
-  webGpuState.lineParamsBuffers = Array.from({ length: 4 }, () => webGpuState.device.createBuffer({
+  webGpuState.lineParamsBuffers = Array.from({ length: 4 }, () => device.createBuffer({
     size: 4 * 16,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   }));
-  webGpuState.blurParamsBuffers = Array.from({ length: 5 }, () => webGpuState.device.createBuffer({
+  webGpuState.blurParamsBuffers = Array.from({ length: 5 }, () => device.createBuffer({
     size: 2 * 16,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   }));
-  webGpuState.segmentBuffer = webGpuState.device.createBuffer({
+  webGpuState.segmentBuffer = device.createBuffer({
     size: MAX_CONTOUR_SEGMENTS * SEGMENT_STRIDE_BYTES,
     usage: GPUBufferUsage.STORAGE,
   });
-  webGpuState.linearSampler = webGpuState.device.createSampler({
+  webGpuState.linearSampler = device.createSampler({
     magFilter: "linear",
     minFilter: "linear",
     mipmapFilter: "linear",
@@ -742,7 +809,8 @@ function createStaticTextures() {
   });
 }
 
-function createPipelines() {
+function createPipelines(): void {
+  const device = requireWebGpuDevice();
   const fullscreenVertexModule = createShaderModule(FULLSCREEN_VERTEX_SHADER);
   const fieldModule = createShaderModule(FIELD_SHADER);
   const reduceModule = createShaderModule(REDUCE_SHADER);
@@ -751,7 +819,7 @@ function createPipelines() {
   const segmentModule = createShaderModule(SEGMENT_RENDER_SHADER);
   const blurModule = createShaderModule(BLUR_SHADER);
 
-  webGpuState.fieldPipeline = webGpuState.device.createRenderPipeline({
+  webGpuState.fieldPipeline = device.createRenderPipeline({
     layout: "auto",
     vertex: {
       module: fullscreenVertexModule,
@@ -771,7 +839,7 @@ function createPipelines() {
     },
   });
 
-  webGpuState.reducePipeline = webGpuState.device.createRenderPipeline({
+  webGpuState.reducePipeline = device.createRenderPipeline({
     layout: "auto",
     vertex: {
       module: fullscreenVertexModule,
@@ -787,7 +855,7 @@ function createPipelines() {
     },
   });
 
-  webGpuState.backgroundPipeline = webGpuState.device.createRenderPipeline({
+  webGpuState.backgroundPipeline = device.createRenderPipeline({
     layout: "auto",
     vertex: {
       module: fullscreenVertexModule,
@@ -803,7 +871,7 @@ function createPipelines() {
     },
   });
 
-  webGpuState.contourPipeline = webGpuState.device.createComputePipeline({
+  webGpuState.contourPipeline = device.createComputePipeline({
     layout: "auto",
     compute: {
       module: contourModule,
@@ -811,7 +879,7 @@ function createPipelines() {
     },
   });
 
-  webGpuState.linePipeline = webGpuState.device.createRenderPipeline({
+  webGpuState.linePipeline = device.createRenderPipeline({
     layout: "auto",
     vertex: {
       module: segmentModule,
@@ -843,7 +911,7 @@ function createPipelines() {
     },
   });
 
-  webGpuState.lineUnionPipeline = webGpuState.device.createRenderPipeline({
+  webGpuState.lineUnionPipeline = device.createRenderPipeline({
     layout: "auto",
     vertex: {
       module: segmentModule,
@@ -875,7 +943,7 @@ function createPipelines() {
     },
   });
 
-  webGpuState.blurPipeline = webGpuState.device.createRenderPipeline({
+  webGpuState.blurPipeline = device.createRenderPipeline({
     layout: "auto",
     vertex: {
       module: blurModule,
@@ -908,8 +976,8 @@ function createPipelines() {
   });
 }
 
-function uploadDitherTexture() {
-  webGpuState.device.queue.writeTexture(
+function uploadDitherTexture(): void {
+  requireWebGpuDevice().queue.writeTexture(
     { texture: webGpuState.ditherTexture },
     fieldGeometry.dither,
     {
@@ -924,7 +992,7 @@ function uploadDitherTexture() {
   );
 }
 
-function ensureCanvasConfigured() {
+function ensureCanvasConfigured(): boolean {
   if (!webGpuState.ready || !webGpuState.context) {
     return false;
   }
@@ -932,8 +1000,8 @@ function ensureCanvasConfigured() {
   if (!webGpuState.dirtyContextConfig && webGpuState.currentCanvasSize === sizeKey) {
     return true;
   }
-  webGpuState.context.configure({
-    device: webGpuState.device,
+  requireWebGpuContext().configure({
+    device: requireWebGpuDevice(),
     format: webGpuState.canvasFormat,
     alphaMode: "opaque",
   });
@@ -943,7 +1011,7 @@ function ensureCanvasConfigured() {
   return true;
 }
 
-async function primeWebGpuRenderer() {
+async function primeWebGpuRenderer(): Promise<boolean> {
   if (webGpuState.ready) {
     return true;
   }
@@ -960,16 +1028,20 @@ async function primeWebGpuRenderer() {
 
   webGpuState.initPromise = (async () => {
     try {
-      webGpuState.adapter = await navigator.gpu.requestAdapter();
+      const gpu = navigator.gpu;
+      if (!gpu) {
+        throw new Error("WebGPU is unavailable");
+      }
+      webGpuState.adapter = await gpu.requestAdapter();
       if (!webGpuState.adapter) {
         throw new Error("No WebGPU adapter available");
       }
       webGpuState.device = await webGpuState.adapter.requestDevice();
-      webGpuState.context = wgpuCanvas.getContext("webgpu");
+      webGpuState.context = wgpuCanvas.getContext("webgpu") as GPUCanvasContext | null;
       if (!webGpuState.context) {
         throw new Error("WebGPU canvas context unavailable");
       }
-      webGpuState.canvasFormat = navigator.gpu.getPreferredCanvasFormat();
+      webGpuState.canvasFormat = gpu.getPreferredCanvasFormat?.() ?? "bgra8unorm";
       createStaticTextures();
       createFieldTextures();
       buildReductionChain();
@@ -989,7 +1061,8 @@ async function primeWebGpuRenderer() {
   return webGpuState.initPromise;
 }
 
-function uploadSpatialAtlas(spatialAtlas) {
+function uploadSpatialAtlas(spatialAtlas: SpatialAtlasCache): void {
+  const readyState = requireInitializedWebGpuState();
   if (webGpuState.uploadedAtlasKey === spatialAtlas.key) {
     return;
   }
@@ -998,8 +1071,8 @@ function uploadSpatialAtlas(spatialAtlas) {
     height: fieldSize,
     depthOrArrayLayers: spatialAtlas.modeCount,
   };
-  webGpuState.device.queue.writeTexture(
-    { texture: webGpuState.sharpAtlasTexture },
+  requireWebGpuDevice().queue.writeTexture(
+    { texture: readyState.sharpAtlasTexture },
     spatialAtlas.sharp,
     {
       offset: 0,
@@ -1008,8 +1081,8 @@ function uploadSpatialAtlas(spatialAtlas) {
     },
     uploadExtent,
   );
-  webGpuState.device.queue.writeTexture(
-    { texture: webGpuState.blurredAtlasTexture },
+  requireWebGpuDevice().queue.writeTexture(
+    { texture: readyState.blurredAtlasTexture },
     spatialAtlas.blurred,
     {
       offset: 0,
@@ -1021,7 +1094,8 @@ function uploadSpatialAtlas(spatialAtlas) {
   webGpuState.uploadedAtlasKey = spatialAtlas.key;
 }
 
-function uploadModeState(modeRenderState) {
+function uploadModeState(modeRenderState: ModeRenderState): void {
+  const readyState = requireInitializedWebGpuState();
   const packed = new Float32Array(MAX_MODES * 8);
   for (let index = 0; index < state.modeState.length; index += 1) {
     const offset = index * 8;
@@ -1034,14 +1108,21 @@ function uploadModeState(modeRenderState) {
     packed[offset + 6] = modeRenderState.color[index * 3 + 2];
     packed[offset + 7] = 0;
   }
-  webGpuState.device.queue.writeBuffer(webGpuState.modeStateBuffer, 0, packed);
+  requireWebGpuDevice().queue.writeBuffer(readyState.modeStateBuffer, 0, packed);
 }
 
-function encodeFieldPass(encoder, spatialAtlas, modeRenderState, isSingleMode, useGlowColor) {
+function encodeFieldPass(
+  encoder: GPUCommandEncoder,
+  spatialAtlas: SpatialAtlasCache,
+  modeRenderState: ModeRenderState,
+  isSingleMode: boolean,
+  useGlowColor: boolean,
+): void {
+  const readyState = requireInitializedWebGpuState();
   uploadSpatialAtlas(spatialAtlas);
   uploadModeState(modeRenderState);
-  webGpuState.device.queue.writeBuffer(
-    webGpuState.fieldParamsBuffer,
+  requireWebGpuDevice().queue.writeBuffer(
+    readyState.fieldParamsBuffer,
     0,
     new Uint32Array([
       state.modeState.length,
@@ -1051,60 +1132,62 @@ function encodeFieldPass(encoder, spatialAtlas, modeRenderState, isSingleMode, u
     ]),
   );
 
-  const bindGroup = webGpuState.device.createBindGroup({
-    layout: webGpuState.fieldPipeline.getBindGroupLayout(0),
+  const device = requireWebGpuDevice();
+  const bindGroup = device.createBindGroup({
+    layout: readyState.fieldPipeline.getBindGroupLayout(0),
     entries: [
-      { binding: 0, resource: webGpuState.sharpAtlasTexture.createView({ dimension: "2d-array", arrayLayerCount: MAX_MODES }) },
-      { binding: 1, resource: webGpuState.blurredAtlasTexture.createView({ dimension: "2d-array", arrayLayerCount: MAX_MODES }) },
-      { binding: 2, resource: { buffer: webGpuState.modeStateBuffer } },
-      { binding: 3, resource: { buffer: webGpuState.fieldParamsBuffer } },
+      { binding: 0, resource: readyState.sharpAtlasTexture.createView({ dimension: "2d-array", arrayLayerCount: MAX_MODES }) },
+      { binding: 1, resource: readyState.blurredAtlasTexture.createView({ dimension: "2d-array", arrayLayerCount: MAX_MODES }) },
+      { binding: 2, resource: { buffer: readyState.modeStateBuffer } },
+      { binding: 3, resource: { buffer: readyState.fieldParamsBuffer } },
     ],
   });
 
   const pass = encoder.beginRenderPass({
     colorAttachments: [
       {
-        view: webGpuState.fieldView,
+        view: readyState.fieldView,
         clearValue: { r: 0, g: 0, b: 0, a: 0 },
         loadOp: "clear",
         storeOp: "store",
       },
       {
-        view: webGpuState.colorAccumView,
+        view: readyState.colorAccumView,
         clearValue: { r: 0, g: 0, b: 0, a: 0 },
         loadOp: "clear",
         storeOp: "store",
       },
       {
-        view: webGpuState.colorWeightView,
+        view: readyState.colorWeightView,
         clearValue: { r: 0, g: 0, b: 0, a: 0 },
         loadOp: "clear",
         storeOp: "store",
       },
     ],
   });
-  pass.setPipeline(webGpuState.fieldPipeline);
+  pass.setPipeline(readyState.fieldPipeline);
   pass.setBindGroup(0, bindGroup);
   pass.draw(3, 1, 0, 0);
   pass.end();
 }
 
-function encodeReductionPasses(encoder) {
-  let sourceView = webGpuState.fieldView;
+function encodeReductionPasses(encoder: GPUCommandEncoder): void {
+  const readyState = requireInitializedWebGpuState();
+  let sourceView = readyState.fieldView;
   let sourceWidth = fieldSize;
   let sourceHeight = fieldSize;
 
   for (const target of webGpuState.reductionChain) {
-    webGpuState.device.queue.writeBuffer(
-      webGpuState.reduceParamsBuffer,
+    requireWebGpuDevice().queue.writeBuffer(
+      readyState.reduceParamsBuffer,
       0,
       new Uint32Array([sourceWidth, sourceHeight, 0, 0]),
     );
-    const bindGroup = webGpuState.device.createBindGroup({
-      layout: webGpuState.reducePipeline.getBindGroupLayout(0),
+    const bindGroup = requireWebGpuDevice().createBindGroup({
+      layout: readyState.reducePipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: sourceView },
-        { binding: 1, resource: { buffer: webGpuState.reduceParamsBuffer } },
+        { binding: 1, resource: { buffer: readyState.reduceParamsBuffer } },
       ],
     });
     const pass = encoder.beginRenderPass({
@@ -1117,7 +1200,7 @@ function encodeReductionPasses(encoder) {
         },
       ],
     });
-    pass.setPipeline(webGpuState.reducePipeline);
+    pass.setPipeline(readyState.reducePipeline);
     pass.setBindGroup(0, bindGroup);
     pass.draw(3, 1, 0, 0);
     pass.end();
@@ -1127,29 +1210,31 @@ function encodeReductionPasses(encoder) {
   }
 }
 
-function encodeContourPass(encoder) {
-  webGpuState.device.queue.writeBuffer(
-    webGpuState.contourParamsBuffer,
+function encodeContourPass(encoder: GPUCommandEncoder): void {
+  const readyState = requireInitializedWebGpuState();
+  requireWebGpuDevice().queue.writeBuffer(
+    readyState.contourParamsBuffer,
     0,
     new Uint32Array([state.plateShape === "circle" ? 1 : 0, 0, 0, 0]),
   );
-  const bindGroup = webGpuState.device.createBindGroup({
-    layout: webGpuState.contourPipeline.getBindGroupLayout(0),
+  const bindGroup = requireWebGpuDevice().createBindGroup({
+    layout: readyState.contourPipeline.getBindGroupLayout(0),
     entries: [
-      { binding: 0, resource: webGpuState.fieldView },
-      { binding: 1, resource: { buffer: webGpuState.segmentBuffer } },
-      { binding: 2, resource: { buffer: webGpuState.contourParamsBuffer } },
+      { binding: 0, resource: readyState.fieldView },
+      { binding: 1, resource: { buffer: readyState.segmentBuffer } },
+      { binding: 2, resource: { buffer: readyState.contourParamsBuffer } },
     ],
   });
   const pass = encoder.beginComputePass();
-  pass.setPipeline(webGpuState.contourPipeline);
+  pass.setPipeline(readyState.contourPipeline);
   pass.setBindGroup(0, bindGroup);
   pass.dispatchWorkgroups(Math.ceil(FIELD_STRIDE / 8), Math.ceil(FIELD_STRIDE / 8), 1);
   pass.end();
 }
 
-function encodeBackgroundPass(encoder, targetView, params) {
-  const reductionView = webGpuState.reductionChain[webGpuState.reductionChain.length - 1]?.view ?? webGpuState.fieldView;
+function encodeBackgroundPass(encoder: GPUCommandEncoder, targetView: GPUTextureView, params: WebGpuRenderParams): void {
+  const readyState = requireInitializedWebGpuState();
+  const reductionView = webGpuState.reductionChain[webGpuState.reductionChain.length - 1]?.view ?? readyState.fieldView;
   const backgroundParams = new Float32Array([
     wgpuCanvas.width, wgpuCanvas.height, params.centroid, params.rms,
     params.haloSharpness, params.backgroundWeight, params.contrast, params.singleAmpGate,
@@ -1161,17 +1246,17 @@ function encodeBackgroundPass(encoder, targetView, params) {
     params.themePalette.atmosphereCore[0], params.themePalette.atmosphereCore[1], params.themePalette.atmosphereCore[2], 0,
     params.themePalette.atmosphereOuter[0], params.themePalette.atmosphereOuter[1], params.themePalette.atmosphereOuter[2], 0,
   ]);
-  webGpuState.device.queue.writeBuffer(webGpuState.backgroundParamsBuffer, 0, backgroundParams);
+  requireWebGpuDevice().queue.writeBuffer(readyState.backgroundParamsBuffer, 0, backgroundParams);
 
-  const bindGroup = webGpuState.device.createBindGroup({
-    layout: webGpuState.backgroundPipeline.getBindGroupLayout(0),
+  const bindGroup = requireWebGpuDevice().createBindGroup({
+    layout: readyState.backgroundPipeline.getBindGroupLayout(0),
     entries: [
-      { binding: 0, resource: webGpuState.fieldView },
-      { binding: 1, resource: webGpuState.colorAccumView },
-      { binding: 2, resource: webGpuState.colorWeightView },
+      { binding: 0, resource: readyState.fieldView },
+      { binding: 1, resource: readyState.colorAccumView },
+      { binding: 2, resource: readyState.colorWeightView },
       { binding: 3, resource: reductionView },
-      { binding: 4, resource: webGpuState.ditherTexture.createView() },
-      { binding: 5, resource: { buffer: webGpuState.backgroundParamsBuffer } },
+      { binding: 4, resource: readyState.ditherTexture.createView() },
+      { binding: 5, resource: { buffer: readyState.backgroundParamsBuffer } },
     ],
   });
 
@@ -1190,13 +1275,13 @@ function encodeBackgroundPass(encoder, targetView, params) {
       },
     ],
   });
-  pass.setPipeline(webGpuState.backgroundPipeline);
+  pass.setPipeline(readyState.backgroundPipeline);
   pass.setBindGroup(0, bindGroup);
   pass.draw(3, 1, 0, 0);
   pass.end();
 }
 
-function buildTargetMetrics(targetWidth, targetHeight) {
+function buildTargetMetrics(targetWidth: number, targetHeight: number) {
   const inset = targetWidth * 0.09;
   return {
     width: targetWidth,
@@ -1207,7 +1292,21 @@ function buildTargetMetrics(targetWidth, targetHeight) {
   };
 }
 
-function encodeLinePass(encoder, targetView, metrics, bufferIndex, color, lineWidth, blurRadius, alpha, crisp, loadOp = "load", pipeline = webGpuState.linePipeline) {
+function encodeLinePass(
+  encoder: GPUCommandEncoder,
+  targetView: GPUTextureView,
+  metrics: { width: number; height: number; inset: number; drawSize: number; scale: number },
+  bufferIndex: number,
+  color: RGBColor,
+  lineWidth: number,
+  blurRadius: number,
+  alpha: number,
+  crisp: boolean,
+  loadOp = "load",
+  pipeline?: GPURenderPipeline,
+): void {
+  const readyState = requireInitializedWebGpuState();
+  const resolvedPipeline = pipeline ?? readyState.linePipeline;
   const lineParamsBuffer = webGpuState.lineParamsBuffers[bufferIndex];
   const lineParams = new Float32Array([
     metrics.width, metrics.height, metrics.inset, metrics.drawSize,
@@ -1215,12 +1314,12 @@ function encodeLinePass(encoder, targetView, metrics, bufferIndex, color, lineWi
     color[0], color[1], color[2], 0,
     state.plateShape === "circle" ? 1 : 0, crisp ? 1 : 0, 0, 0,
   ]);
-  webGpuState.device.queue.writeBuffer(lineParamsBuffer, 0, lineParams);
+  requireWebGpuDevice().queue.writeBuffer(lineParamsBuffer, 0, lineParams);
 
-  const bindGroup = webGpuState.device.createBindGroup({
-    layout: pipeline.getBindGroupLayout(0),
+  const bindGroup = requireWebGpuDevice().createBindGroup({
+    layout: resolvedPipeline.getBindGroupLayout(0),
     entries: [
-      { binding: 0, resource: { buffer: webGpuState.segmentBuffer } },
+      { binding: 0, resource: { buffer: readyState.segmentBuffer } },
       { binding: 1, resource: { buffer: lineParamsBuffer } },
     ],
   });
@@ -1235,25 +1334,37 @@ function encodeLinePass(encoder, targetView, metrics, bufferIndex, color, lineWi
       },
     ],
   });
-  pass.setPipeline(pipeline);
+  pass.setPipeline(resolvedPipeline);
   pass.setBindGroup(0, bindGroup);
   pass.draw(6, MAX_CONTOUR_SEGMENTS, 0, 0);
   pass.end();
 }
 
-function encodeBlurPass(encoder, sourceView, targetView, sourceWidth, sourceHeight, bufferIndex, direction, sigma, opacity, loadOp = "load") {
+function encodeBlurPass(
+  encoder: GPUCommandEncoder,
+  sourceView: GPUTextureView,
+  targetView: GPUTextureView,
+  sourceWidth: number,
+  sourceHeight: number,
+  bufferIndex: number,
+  direction: [number, number],
+  sigma: number,
+  opacity: number,
+  loadOp = "load",
+): void {
+  const readyState = requireInitializedWebGpuState();
   const blurParamsBuffer = webGpuState.blurParamsBuffers[bufferIndex];
   const resolvedSigma = Math.max(sigma * 0.68, 0.18);
   const blurParams = new Float32Array([
     sourceWidth, sourceHeight, 0, 0,
     direction[0], direction[1], resolvedSigma, opacity,
   ]);
-  webGpuState.device.queue.writeBuffer(blurParamsBuffer, 0, blurParams);
+  requireWebGpuDevice().queue.writeBuffer(blurParamsBuffer, 0, blurParams);
 
-  const bindGroup = webGpuState.device.createBindGroup({
-    layout: webGpuState.blurPipeline.getBindGroupLayout(0),
+  const bindGroup = requireWebGpuDevice().createBindGroup({
+    layout: readyState.blurPipeline.getBindGroupLayout(0),
     entries: [
-      { binding: 0, resource: webGpuState.linearSampler },
+      { binding: 0, resource: readyState.linearSampler },
       { binding: 1, resource: sourceView },
       { binding: 2, resource: { buffer: blurParamsBuffer } },
     ],
@@ -1269,13 +1380,14 @@ function encodeBlurPass(encoder, sourceView, targetView, sourceWidth, sourceHeig
       },
     ],
   });
-  pass.setPipeline(webGpuState.blurPipeline);
+  pass.setPipeline(readyState.blurPipeline);
   pass.setBindGroup(0, bindGroup);
   pass.draw(3, 1, 0, 0);
   pass.end();
 }
 
-function renderGlowContours(encoder, targetView, params) {
+function renderGlowContours(encoder: GPUCommandEncoder, targetView: GPUTextureView, params: WebGpuRenderParams): void {
+  const readyState = requireInitializedWebGpuState();
   const alpha = Math.max(0.1, params.singleAmpGate);
   const thickness = numericControls.glowThickness;
   const spread = numericControls.glowSpread;
@@ -1299,7 +1411,7 @@ function renderGlowContours(encoder, targetView, params) {
 
   encodeLinePass(
     encoder,
-    webGpuState.glowSourceView,
+    readyState.glowSourceView,
     offscreenMetrics,
     0,
     outerGlowColor,
@@ -1308,14 +1420,14 @@ function renderGlowContours(encoder, targetView, params) {
     outerAlpha,
     true,
     "clear",
-    webGpuState.lineUnionPipeline,
+    readyState.lineUnionPipeline,
   );
-  encodeBlurPass(encoder, webGpuState.glowSourceView, webGpuState.glowBlurView, webGpuState.glowTargetWidth, webGpuState.glowTargetHeight, 0, [1, 0], outerBlur * offscreenMetrics.scale, 1, "clear");
-  encodeBlurPass(encoder, webGpuState.glowBlurView, targetView, webGpuState.glowTargetWidth, webGpuState.glowTargetHeight, 1, [0, 1], outerBlur * offscreenMetrics.scale, outerCompositeOpacity, "load");
+  encodeBlurPass(encoder, readyState.glowSourceView, readyState.glowBlurView, webGpuState.glowTargetWidth, webGpuState.glowTargetHeight, 0, [1, 0], outerBlur * offscreenMetrics.scale, 1, "clear");
+  encodeBlurPass(encoder, readyState.glowBlurView, targetView, webGpuState.glowTargetWidth, webGpuState.glowTargetHeight, 1, [0, 1], outerBlur * offscreenMetrics.scale, outerCompositeOpacity, "load");
 
   encodeLinePass(
     encoder,
-    webGpuState.glowSourceView,
+    readyState.glowSourceView,
     offscreenMetrics,
     1,
     innerGlowColor,
@@ -1324,14 +1436,14 @@ function renderGlowContours(encoder, targetView, params) {
     innerAlpha,
     true,
     "clear",
-    webGpuState.lineUnionPipeline,
+    readyState.lineUnionPipeline,
   );
-  encodeBlurPass(encoder, webGpuState.glowSourceView, webGpuState.glowBlurView, webGpuState.glowTargetWidth, webGpuState.glowTargetHeight, 2, [1, 0], innerBlur * offscreenMetrics.scale, 1, "clear");
-  encodeBlurPass(encoder, webGpuState.glowBlurView, targetView, webGpuState.glowTargetWidth, webGpuState.glowTargetHeight, 3, [0, 1], innerBlur * offscreenMetrics.scale, innerCompositeOpacity, "load");
+  encodeBlurPass(encoder, readyState.glowSourceView, readyState.glowBlurView, webGpuState.glowTargetWidth, webGpuState.glowTargetHeight, 2, [1, 0], innerBlur * offscreenMetrics.scale, 1, "clear");
+  encodeBlurPass(encoder, readyState.glowBlurView, targetView, webGpuState.glowTargetWidth, webGpuState.glowTargetHeight, 3, [0, 1], innerBlur * offscreenMetrics.scale, innerCompositeOpacity, "load");
 
   encodeLinePass(
     encoder,
-    webGpuState.glowSourceView,
+    readyState.glowSourceView,
     offscreenMetrics,
     2,
     lineColor,
@@ -1340,12 +1452,13 @@ function renderGlowContours(encoder, targetView, params) {
     (0.32 + alpha * 0.34) * 1.15,
     true,
     "clear",
-    webGpuState.lineUnionPipeline,
+    readyState.lineUnionPipeline,
   );
-  encodeBlurPass(encoder, webGpuState.glowSourceView, targetView, webGpuState.glowTargetWidth, webGpuState.glowTargetHeight, 4, [0, 0], 0.001, 1, "load");
+  encodeBlurPass(encoder, readyState.glowSourceView, targetView, webGpuState.glowTargetWidth, webGpuState.glowTargetHeight, 4, [0, 0], 0.001, 1, "load");
 }
 
-function renderIsolineContours(encoder, targetView, params) {
+function renderIsolineContours(encoder: GPUCommandEncoder, targetView: GPUTextureView, params: WebGpuRenderParams): void {
+  const readyState = requireInitializedWebGpuState();
   const thresholdAlpha = Math.max(0.12, params.singleAmpGate);
   const lineColor = params.themePalette.lineColor;
   const offscreenMetrics = buildTargetMetrics(webGpuState.glowTargetWidth, webGpuState.glowTargetHeight);
@@ -1354,7 +1467,7 @@ function renderIsolineContours(encoder, targetView, params) {
 
   encodeLinePass(
     encoder,
-    webGpuState.glowSourceView,
+    readyState.glowSourceView,
     offscreenMetrics,
     0,
     lineColor,
@@ -1363,11 +1476,11 @@ function renderIsolineContours(encoder, targetView, params) {
     lineOpacity,
     true,
     "clear",
-    webGpuState.lineUnionPipeline,
+    readyState.lineUnionPipeline,
   );
   encodeBlurPass(
     encoder,
-    webGpuState.glowSourceView,
+    readyState.glowSourceView,
     targetView,
     webGpuState.glowTargetWidth,
     webGpuState.glowTargetHeight,
@@ -1379,13 +1492,19 @@ function renderIsolineContours(encoder, targetView, params) {
   );
 }
 
-function renderSignedFieldWithWebGpu(spatialAtlas, modeRenderState, params, frameProfileTools) {
+function renderSignedFieldWithWebGpu(
+  spatialAtlas: SpatialAtlasCache,
+  modeRenderState: ModeRenderState,
+  params: WebGpuRenderParams,
+  frameProfileTools: WebGpuFrameProfileTools,
+): boolean {
   if (!webGpuState.ready || !ensureCanvasConfigured()) {
     return false;
   }
 
   try {
-    const encoder = webGpuState.device.createCommandEncoder();
+    const readyState = requireInitializedWebGpuState();
+    const encoder = readyState.device.createCommandEncoder();
 
     let profileStart = frameProfileTools.profileSectionStart(frameProfileTools.frameProfile);
     encodeFieldPass(encoder, spatialAtlas, modeRenderState, params.isSingleMode, params.useGlowColor);
@@ -1396,7 +1515,7 @@ function renderSignedFieldWithWebGpu(spatialAtlas, modeRenderState, params, fram
     frameProfileTools.profileSectionEnd(frameProfileTools.frameProfile, "webgpuReduce", profileStart);
 
     profileStart = frameProfileTools.profileSectionStart(frameProfileTools.frameProfile);
-    const targetView = webGpuState.context.getCurrentTexture().createView();
+    const targetView = readyState.context.getCurrentTexture().createView();
     encodeBackgroundPass(encoder, targetView, params);
     encodeContourPass(encoder);
     if (state.renderStyle === "glow") {
@@ -1406,7 +1525,7 @@ function renderSignedFieldWithWebGpu(spatialAtlas, modeRenderState, params, fram
     }
     frameProfileTools.profileSectionEnd(frameProfileTools.frameProfile, "webgpuShade", profileStart);
 
-    webGpuState.device.queue.submit([encoder.finish()]);
+    readyState.device.queue.submit([encoder.finish()]);
     setWebGpuCanvasVisible(true, state.plateShape === "circle" && state.combineMode === "signed");
     return true;
   } catch (error) {

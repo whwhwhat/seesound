@@ -14,10 +14,65 @@ import {
   gpuShadePipeline,
   renderBuffers,
   state,
-} from "../state/context.js";
+} from "../state/context";
+import type {
+  GpuFieldPipelineState,
+  GpuFieldPipelineUniforms,
+  GpuShadeParams,
+  GpuShadePipelineState,
+  GpuShadePipelineUniforms,
+  InitializedGpuFieldPipeline,
+  InitializedGpuShadePipeline,
+  ModeRenderState,
+  SpatialAtlasCache,
+} from "../types";
 
-function createGlShader(gl, type, source) {
+function requireGl(): WebGL2RenderingContext {
+  const gl = gpuFieldPipeline.gl;
+  if (!gl) {
+    throw new Error("GPU field pipeline WebGL context is unavailable.");
+  }
+  return gl;
+}
+
+function requireFieldPipeline(): InitializedGpuFieldPipeline {
+  if (
+    !gpuFieldPipeline.gl ||
+    !gpuFieldPipeline.program ||
+    !gpuFieldPipeline.positionBuffer ||
+    !gpuFieldPipeline.framebuffer ||
+    !gpuFieldPipeline.outputTexture ||
+    !gpuFieldPipeline.colorAccumTexture ||
+    !gpuFieldPipeline.colorWeightTexture ||
+    !gpuFieldPipeline.sharpAtlasTexture ||
+    !gpuFieldPipeline.blurredAtlasTexture ||
+    !gpuFieldPipeline.modeStateTexture ||
+    !gpuFieldPipeline.attribs ||
+    !gpuFieldPipeline.uniforms
+  ) {
+    throw new Error("GPU field pipeline is not initialized.");
+  }
+  return gpuFieldPipeline as InitializedGpuFieldPipeline;
+}
+
+function requireShadePipeline(): InitializedGpuShadePipeline {
+  if (
+    !gpuShadePipeline.program ||
+    !gpuShadePipeline.positionBuffer ||
+    !gpuShadePipeline.ditherTexture ||
+    !gpuShadePipeline.attribs ||
+    !gpuShadePipeline.uniforms
+  ) {
+    throw new Error("GPU shade pipeline is not initialized.");
+  }
+  return gpuShadePipeline as InitializedGpuShadePipeline;
+}
+
+function createGlShader(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
   const shader = gl.createShader(type);
+  if (!shader) {
+    throw new Error("Unable to create WebGL shader.");
+  }
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
@@ -28,10 +83,13 @@ function createGlShader(gl, type, source) {
   return shader;
 }
 
-function createGlProgram(gl, vertexSource, fragmentSource) {
+function createGlProgram(gl: WebGL2RenderingContext, vertexSource: string, fragmentSource: string): WebGLProgram {
   const vertexShader = createGlShader(gl, gl.VERTEX_SHADER, vertexSource);
   const fragmentShader = createGlShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
   const program = gl.createProgram();
+  if (!program) {
+    throw new Error("Unable to create WebGL program.");
+  }
   gl.attachShader(program, vertexShader);
   gl.attachShader(program, fragmentShader);
   gl.linkProgram(program);
@@ -45,7 +103,7 @@ function createGlProgram(gl, vertexSource, fragmentSource) {
   return program;
 }
 
-function ensureGpuFieldPipeline() {
+function ensureGpuFieldPipeline(): boolean {
   if (gpuFieldPipeline.available) {
     return true;
   }
@@ -75,6 +133,25 @@ function ensureGpuFieldPipeline() {
 
     const program = createGlProgram(gl, GPU_FIELD_VERTEX_SHADER, GPU_FIELD_FRAGMENT_SHADER);
     const positionBuffer = gl.createBuffer();
+    const framebuffer = gl.createFramebuffer();
+    const outputTexture = gl.createTexture();
+    const colorAccumTexture = gl.createTexture();
+    const colorWeightTexture = gl.createTexture();
+    const sharpAtlasTexture = gl.createTexture();
+    const blurredAtlasTexture = gl.createTexture();
+    const modeStateTexture = gl.createTexture();
+    if (
+      !positionBuffer ||
+      !framebuffer ||
+      !outputTexture ||
+      !colorAccumTexture ||
+      !colorWeightTexture ||
+      !sharpAtlasTexture ||
+      !blurredAtlasTexture ||
+      !modeStateTexture
+    ) {
+      throw new Error("Unable to allocate GPU field pipeline resources.");
+    }
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(
       gl.ARRAY_BUFFER,
@@ -87,8 +164,6 @@ function ensureGpuFieldPipeline() {
       gl.STATIC_DRAW,
     );
 
-    const framebuffer = gl.createFramebuffer();
-    const outputTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, outputTexture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -96,7 +171,6 @@ function ensureGpuFieldPipeline() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, fieldSize, fieldSize, 0, gl.RGBA, gl.FLOAT, null);
 
-    const colorAccumTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, colorAccumTexture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -104,7 +178,6 @@ function ensureGpuFieldPipeline() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, fieldSize, fieldSize, 0, gl.RGBA, gl.FLOAT, null);
 
-    const colorWeightTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, colorWeightTexture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -112,21 +185,18 @@ function ensureGpuFieldPipeline() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, fieldSize, fieldSize, 0, gl.RGBA, gl.FLOAT, null);
 
-    const sharpAtlasTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, sharpAtlasTexture);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-    const blurredAtlasTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, blurredAtlasTexture);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-    const modeStateTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, modeStateTexture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -177,7 +247,7 @@ function ensureGpuFieldPipeline() {
   }
 }
 
-function ensureGpuShadePipeline() {
+function ensureGpuShadePipeline(): boolean {
   if (!gpuFieldPipeline.available) {
     return false;
   }
@@ -185,10 +255,14 @@ function ensureGpuShadePipeline() {
     return true;
   }
 
-  const gl = gpuFieldPipeline.gl;
+  const gl = requireGl();
   try {
     const program = createGlProgram(gl, GPU_SHADE_VERTEX_SHADER, GPU_SHADE_FRAGMENT_SHADER);
     const positionBuffer = gl.createBuffer();
+    const ditherTexture = gl.createTexture();
+    if (!positionBuffer || !ditherTexture) {
+      throw new Error("Unable to allocate GPU shade pipeline resources.");
+    }
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(
       gl.ARRAY_BUFFER,
@@ -201,7 +275,6 @@ function ensureGpuShadePipeline() {
       gl.STATIC_DRAW,
     );
 
-    const ditherTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, ditherTexture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -255,22 +328,23 @@ function ensureGpuShadePipeline() {
   }
 }
 
-function uploadDitherTexture() {
+function uploadDitherTexture(): boolean {
   if (!ensureGpuShadePipeline() || gpuShadePipeline.uploadedDither) {
     return gpuShadePipeline.available;
   }
-  const gl = gpuFieldPipeline.gl;
+  const gl = requireGl();
+  const shadePipeline = requireShadePipeline();
   const ditherPixels = new Float32Array(fieldCellCount);
   for (let ptr = 0; ptr < fieldCellCount; ptr += 1) {
     ditherPixels[ptr] = fieldGeometry.dither[ptr];
   }
-  gl.bindTexture(gl.TEXTURE_2D, gpuShadePipeline.ditherTexture);
+  gl.bindTexture(gl.TEXTURE_2D, shadePipeline.ditherTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, fieldSize, fieldSize, 0, gl.RED, gl.FLOAT, ditherPixels);
   gpuShadePipeline.uploadedDither = true;
   return true;
 }
 
-function uploadSpatialAtlasToGpu(spatialAtlas) {
+function uploadSpatialAtlasToGpu(spatialAtlas: SpatialAtlasCache): boolean {
   if (!ensureGpuFieldPipeline()) {
     return false;
   }
@@ -278,18 +352,19 @@ function uploadSpatialAtlasToGpu(spatialAtlas) {
     return true;
   }
 
-  const gl = gpuFieldPipeline.gl;
-  gl.bindTexture(gl.TEXTURE_2D_ARRAY, gpuFieldPipeline.sharpAtlasTexture);
+  const gl = requireGl();
+  const fieldPipeline = requireFieldPipeline();
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, fieldPipeline.sharpAtlasTexture);
   gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.R32F, fieldSize, fieldSize, spatialAtlas.modeCount, 0, gl.RED, gl.FLOAT, spatialAtlas.sharp);
 
-  gl.bindTexture(gl.TEXTURE_2D_ARRAY, gpuFieldPipeline.blurredAtlasTexture);
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, fieldPipeline.blurredAtlasTexture);
   gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.R32F, fieldSize, fieldSize, spatialAtlas.modeCount, 0, gl.RED, gl.FLOAT, spatialAtlas.blurred);
 
   gpuFieldPipeline.uploadedSpatialKey = spatialAtlas.key;
   return true;
 }
 
-function buildGpuModeStateTexture(modeRenderState) {
+function buildGpuModeStateTexture(modeRenderState: ModeRenderState): Float32Array {
   const packed = new Float32Array(8 * 48);
   for (let index = 0; index < state.modeState.length; index += 1) {
     const offset = index * 8;
@@ -305,47 +380,53 @@ function buildGpuModeStateTexture(modeRenderState) {
   return packed;
 }
 
-function runGpuFieldAccumulation(spatialAtlas, modeRenderState, isSingleMode, useGlowColor) {
+function runGpuFieldAccumulation(
+  spatialAtlas: SpatialAtlasCache,
+  modeRenderState: ModeRenderState,
+  isSingleMode: boolean,
+  useGlowColor: boolean,
+): boolean {
   if (!uploadSpatialAtlasToGpu(spatialAtlas)) {
     return false;
   }
 
-  const gl = gpuFieldPipeline.gl;
+  const gl = requireGl();
+  const fieldPipeline = requireFieldPipeline();
   const packedModeState = buildGpuModeStateTexture(modeRenderState);
 
-  gl.bindTexture(gl.TEXTURE_2D, gpuFieldPipeline.modeStateTexture);
+  gl.bindTexture(gl.TEXTURE_2D, fieldPipeline.modeStateTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, 8, 48, 0, gl.RED, gl.FLOAT, packedModeState);
 
   gl.viewport(0, 0, fieldSize, fieldSize);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, gpuFieldPipeline.framebuffer);
-  gl.useProgram(gpuFieldPipeline.program);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fieldPipeline.framebuffer);
+  gl.useProgram(fieldPipeline.program);
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, gpuFieldPipeline.positionBuffer);
-  gl.enableVertexAttribArray(gpuFieldPipeline.attribs.position);
-  gl.vertexAttribPointer(gpuFieldPipeline.attribs.position, 2, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, fieldPipeline.positionBuffer);
+  gl.enableVertexAttribArray(fieldPipeline.attribs.position);
+  gl.vertexAttribPointer(fieldPipeline.attribs.position, 2, gl.FLOAT, false, 0, 0);
 
   gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D_ARRAY, gpuFieldPipeline.sharpAtlasTexture);
-  gl.uniform1i(gpuFieldPipeline.uniforms.sharpAtlas, 0);
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, fieldPipeline.sharpAtlasTexture);
+  gl.uniform1i(fieldPipeline.uniforms.sharpAtlas, 0);
 
   gl.activeTexture(gl.TEXTURE1);
-  gl.bindTexture(gl.TEXTURE_2D_ARRAY, gpuFieldPipeline.blurredAtlasTexture);
-  gl.uniform1i(gpuFieldPipeline.uniforms.blurredAtlas, 1);
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, fieldPipeline.blurredAtlasTexture);
+  gl.uniform1i(fieldPipeline.uniforms.blurredAtlas, 1);
 
   gl.activeTexture(gl.TEXTURE2);
-  gl.bindTexture(gl.TEXTURE_2D, gpuFieldPipeline.modeStateTexture);
-  gl.uniform1i(gpuFieldPipeline.uniforms.modeState, 2);
+  gl.bindTexture(gl.TEXTURE_2D, fieldPipeline.modeStateTexture);
+  gl.uniform1i(fieldPipeline.uniforms.modeState, 2);
 
-  gl.uniform1i(gpuFieldPipeline.uniforms.modeCount, state.modeState.length);
-  gl.uniform1i(gpuFieldPipeline.uniforms.singleMode, isSingleMode ? 1 : 0);
-  gl.uniform1i(gpuFieldPipeline.uniforms.signedMode, state.combineMode === "signed" ? 1 : 0);
-  gl.uniform1i(gpuFieldPipeline.uniforms.useGlowColor, useGlowColor ? 1 : 0);
+  gl.uniform1i(fieldPipeline.uniforms.modeCount, state.modeState.length);
+  gl.uniform1i(fieldPipeline.uniforms.singleMode, isSingleMode ? 1 : 0);
+  gl.uniform1i(fieldPipeline.uniforms.signedMode, state.combineMode === "signed" ? 1 : 0);
+  gl.uniform1i(fieldPipeline.uniforms.useGlowColor, useGlowColor ? 1 : 0);
 
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   return true;
 }
 
-function shouldValidateGpuField() {
+function shouldValidateGpuField(): boolean {
   if (!gpuFieldPipeline.available) {
     return false;
   }
@@ -355,12 +436,13 @@ function shouldValidateGpuField() {
   return gpuFieldValidation.frame - gpuFieldValidation.lastComparedFrame >= 120;
 }
 
-function validateGpuFieldAgainstCpu(cpuField) {
+function validateGpuFieldAgainstCpu(cpuField: Float32Array): void {
   if (!gpuFieldPipeline.available) {
     return;
   }
-  const gl = gpuFieldPipeline.gl;
-  gl.bindFramebuffer(gl.FRAMEBUFFER, gpuFieldPipeline.framebuffer);
+  const gl = requireGl();
+  const fieldPipeline = requireFieldPipeline();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fieldPipeline.framebuffer);
   gl.readPixels(0, 0, fieldSize, fieldSize, gl.RGBA, gl.FLOAT, renderBuffers.gpuFieldReadback);
 
   let maxAbsDiff = 0;
@@ -384,12 +466,13 @@ function validateGpuFieldAgainstCpu(cpuField) {
   });
 }
 
-function readGpuFieldIntoCpuBuffer(targetField) {
+function readGpuFieldIntoCpuBuffer(targetField: Float32Array): boolean {
   if (!gpuFieldPipeline.available) {
     return false;
   }
-  const gl = gpuFieldPipeline.gl;
-  gl.bindFramebuffer(gl.FRAMEBUFFER, gpuFieldPipeline.framebuffer);
+  const gl = requireGl();
+  const fieldPipeline = requireFieldPipeline();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fieldPipeline.framebuffer);
   gl.readBuffer(gl.COLOR_ATTACHMENT0);
   gl.readPixels(0, 0, fieldSize, fieldSize, gl.RGBA, gl.FLOAT, renderBuffers.gpuFieldReadback);
   for (let ptr = 0; ptr < fieldCellCount; ptr += 1) {
@@ -398,12 +481,13 @@ function readGpuFieldIntoCpuBuffer(targetField) {
   return true;
 }
 
-function readGpuGlowAccumulation(field, colorWeight, colorAccum) {
+function readGpuGlowAccumulation(field: Float32Array, colorWeight: Float32Array, colorAccum: Float32Array): boolean {
   if (!gpuFieldPipeline.available) {
     return false;
   }
-  const gl = gpuFieldPipeline.gl;
-  gl.bindFramebuffer(gl.FRAMEBUFFER, gpuFieldPipeline.framebuffer);
+  const gl = requireGl();
+  const fieldPipeline = requireFieldPipeline();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fieldPipeline.framebuffer);
 
   gl.readBuffer(gl.COLOR_ATTACHMENT0);
   gl.readPixels(0, 0, fieldSize, fieldSize, gl.RGBA, gl.FLOAT, renderBuffers.gpuFieldReadback);
@@ -429,73 +513,75 @@ function readGpuGlowAccumulation(field, colorWeight, colorAccum) {
   return true;
 }
 
-function shadeFieldOnGpu(params) {
+function shadeFieldOnGpu(params: GpuShadeParams): boolean {
   if (!uploadDitherTexture()) {
     return false;
   }
 
-  const gl = gpuFieldPipeline.gl;
+  const gl = requireGl();
+  const fieldPipeline = requireFieldPipeline();
+  const shadePipeline = requireShadePipeline();
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, glCanvas.width, glCanvas.height);
-  gl.useProgram(gpuShadePipeline.program);
+  gl.useProgram(shadePipeline.program);
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, gpuShadePipeline.positionBuffer);
-  gl.enableVertexAttribArray(gpuShadePipeline.attribs.position);
-  gl.vertexAttribPointer(gpuShadePipeline.attribs.position, 2, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, shadePipeline.positionBuffer);
+  gl.enableVertexAttribArray(shadePipeline.attribs.position);
+  gl.vertexAttribPointer(shadePipeline.attribs.position, 2, gl.FLOAT, false, 0, 0);
 
   gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, gpuFieldPipeline.outputTexture);
-  gl.uniform1i(gpuShadePipeline.uniforms.fieldTex, 0);
+  gl.bindTexture(gl.TEXTURE_2D, fieldPipeline.outputTexture);
+  gl.uniform1i(shadePipeline.uniforms.fieldTex, 0);
 
   gl.activeTexture(gl.TEXTURE1);
-  gl.bindTexture(gl.TEXTURE_2D, gpuFieldPipeline.colorAccumTexture);
-  gl.uniform1i(gpuShadePipeline.uniforms.colorAccumTex, 1);
+  gl.bindTexture(gl.TEXTURE_2D, fieldPipeline.colorAccumTexture);
+  gl.uniform1i(shadePipeline.uniforms.colorAccumTex, 1);
 
   gl.activeTexture(gl.TEXTURE2);
-  gl.bindTexture(gl.TEXTURE_2D, gpuFieldPipeline.colorWeightTexture);
-  gl.uniform1i(gpuShadePipeline.uniforms.colorWeightTex, 2);
+  gl.bindTexture(gl.TEXTURE_2D, fieldPipeline.colorWeightTexture);
+  gl.uniform1i(shadePipeline.uniforms.colorWeightTex, 2);
 
   gl.activeTexture(gl.TEXTURE3);
-  gl.bindTexture(gl.TEXTURE_2D, gpuShadePipeline.ditherTexture);
-  gl.uniform1i(gpuShadePipeline.uniforms.ditherTex, 3);
+  gl.bindTexture(gl.TEXTURE_2D, shadePipeline.ditherTexture);
+  gl.uniform1i(shadePipeline.uniforms.ditherTex, 3);
 
-  gl.uniform2f(gpuShadePipeline.uniforms.texel, 1 / fieldSize, 1 / fieldSize);
-  gl.uniform1f(gpuShadePipeline.uniforms.displayScale, params.displayScale);
-  gl.uniform1f(gpuShadePipeline.uniforms.rms, params.rms);
-  gl.uniform1f(gpuShadePipeline.uniforms.centroid, params.centroid);
-  gl.uniform1f(gpuShadePipeline.uniforms.contrast, params.contrast);
-  gl.uniform1f(gpuShadePipeline.uniforms.coreSharpness, params.coreSharpness);
-  gl.uniform1f(gpuShadePipeline.uniforms.haloSharpness, params.haloSharpness);
-  gl.uniform1f(gpuShadePipeline.uniforms.lineWeight, params.lineWeight);
-  gl.uniform1f(gpuShadePipeline.uniforms.haloWeight, params.haloWeight);
-  gl.uniform1f(gpuShadePipeline.uniforms.backgroundWeight, params.backgroundWeight);
-  gl.uniform1f(gpuShadePipeline.uniforms.singleAmpGate, params.singleAmpGate);
-  gl.uniform1f(gpuShadePipeline.uniforms.separation, params.separation);
-  gl.uniform1f(gpuShadePipeline.uniforms.renderDormant, params.renderAsDormantSingle ? 1 : 0);
-  gl.uniform1f(gpuShadePipeline.uniforms.shapeMode, state.plateShape === "circle" ? 1 : 0);
-  gl.uniform1f(gpuShadePipeline.uniforms.useGlowColor, params.useGlowColor ? 1 : 0);
-  gl.uniform1f(gpuShadePipeline.uniforms.glowThickness, params.glowThickness);
-  gl.uniform1f(gpuShadePipeline.uniforms.glowSpread, params.glowSpread);
-  gl.uniform1f(gpuShadePipeline.uniforms.atmosphereEnabled, params.atmosphereEnabled ? 1 : 0);
-  gl.uniform3f(gpuShadePipeline.uniforms.baseBgColor, BASE_BG_COLOR[0], BASE_BG_COLOR[1], BASE_BG_COLOR[2]);
-  gl.uniform3f(gpuShadePipeline.uniforms.backdropColor, params.themePalette.backdropColor[0], params.themePalette.backdropColor[1], params.themePalette.backdropColor[2]);
-  gl.uniform3f(gpuShadePipeline.uniforms.baseColor, params.themePalette.baseColor[0], params.themePalette.baseColor[1], params.themePalette.baseColor[2]);
-  gl.uniform3f(gpuShadePipeline.uniforms.lineColor, params.themePalette.lineColor[0], params.themePalette.lineColor[1], params.themePalette.lineColor[2]);
-  gl.uniform3f(gpuShadePipeline.uniforms.outerColor, params.themePalette.outerColor[0], params.themePalette.outerColor[1], params.themePalette.outerColor[2]);
-  gl.uniform3f(gpuShadePipeline.uniforms.glowColor, params.glowColor[0], params.glowColor[1], params.glowColor[2]);
-  gl.uniform3f(gpuShadePipeline.uniforms.atmosphereCore, params.themePalette.atmosphereCore[0], params.themePalette.atmosphereCore[1], params.themePalette.atmosphereCore[2]);
-  gl.uniform3f(gpuShadePipeline.uniforms.atmosphereOuter, params.themePalette.atmosphereOuter[0], params.themePalette.atmosphereOuter[1], params.themePalette.atmosphereOuter[2]);
+  gl.uniform2f(shadePipeline.uniforms.texel, 1 / fieldSize, 1 / fieldSize);
+  gl.uniform1f(shadePipeline.uniforms.displayScale, params.displayScale);
+  gl.uniform1f(shadePipeline.uniforms.rms, params.rms);
+  gl.uniform1f(shadePipeline.uniforms.centroid, params.centroid);
+  gl.uniform1f(shadePipeline.uniforms.contrast, params.contrast);
+  gl.uniform1f(shadePipeline.uniforms.coreSharpness, params.coreSharpness);
+  gl.uniform1f(shadePipeline.uniforms.haloSharpness, params.haloSharpness);
+  gl.uniform1f(shadePipeline.uniforms.lineWeight, params.lineWeight);
+  gl.uniform1f(shadePipeline.uniforms.haloWeight, params.haloWeight);
+  gl.uniform1f(shadePipeline.uniforms.backgroundWeight, params.backgroundWeight);
+  gl.uniform1f(shadePipeline.uniforms.singleAmpGate, params.singleAmpGate);
+  gl.uniform1f(shadePipeline.uniforms.separation, params.separation);
+  gl.uniform1f(shadePipeline.uniforms.renderDormant, params.renderAsDormantSingle ? 1 : 0);
+  gl.uniform1f(shadePipeline.uniforms.shapeMode, state.plateShape === "circle" ? 1 : 0);
+  gl.uniform1f(shadePipeline.uniforms.useGlowColor, params.useGlowColor ? 1 : 0);
+  gl.uniform1f(shadePipeline.uniforms.glowThickness, params.glowThickness);
+  gl.uniform1f(shadePipeline.uniforms.glowSpread, params.glowSpread);
+  gl.uniform1f(shadePipeline.uniforms.atmosphereEnabled, params.atmosphereEnabled ? 1 : 0);
+  gl.uniform3f(shadePipeline.uniforms.baseBgColor, BASE_BG_COLOR[0], BASE_BG_COLOR[1], BASE_BG_COLOR[2]);
+  gl.uniform3f(shadePipeline.uniforms.backdropColor, params.themePalette.backdropColor[0], params.themePalette.backdropColor[1], params.themePalette.backdropColor[2]);
+  gl.uniform3f(shadePipeline.uniforms.baseColor, params.themePalette.baseColor[0], params.themePalette.baseColor[1], params.themePalette.baseColor[2]);
+  gl.uniform3f(shadePipeline.uniforms.lineColor, params.themePalette.lineColor[0], params.themePalette.lineColor[1], params.themePalette.lineColor[2]);
+  gl.uniform3f(shadePipeline.uniforms.outerColor, params.themePalette.outerColor[0], params.themePalette.outerColor[1], params.themePalette.outerColor[2]);
+  gl.uniform3f(shadePipeline.uniforms.glowColor, params.glowColor[0], params.glowColor[1], params.glowColor[2]);
+  gl.uniform3f(shadePipeline.uniforms.atmosphereCore, params.themePalette.atmosphereCore[0], params.themePalette.atmosphereCore[1], params.themePalette.atmosphereCore[2]);
+  gl.uniform3f(shadePipeline.uniforms.atmosphereOuter, params.themePalette.atmosphereOuter[0], params.themePalette.atmosphereOuter[1], params.themePalette.atmosphereOuter[2]);
 
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   return true;
 }
 
-function setGpuCanvasVisible(visible, rotateCircleSigned = false) {
+function setGpuCanvasVisible(visible: boolean, rotateCircleSigned = false): void {
   glCanvas.classList.toggle("is-visible", visible);
   glCanvas.style.transform = rotateCircleSigned ? "rotate(-90deg)" : "";
 }
 
-function setGpuCanvasFrame(active) {
+function setGpuCanvasFrame(active: boolean): void {
   if (!active) {
     glCanvas.style.left = "0";
     glCanvas.style.top = "0";
@@ -512,7 +598,10 @@ function setGpuCanvasFrame(active) {
   glCanvas.style.height = `${drawSize}px`;
 }
 
-function setGpuCanvasPresentation(active, options = {}) {
+function setGpuCanvasPresentation(
+  active: boolean,
+  options: { opacity?: number; blurPx?: number; shadowAlpha?: number } = {},
+): void {
   if (!active) {
     glCanvas.style.opacity = "";
     glCanvas.style.filter = "";

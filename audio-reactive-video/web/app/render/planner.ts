@@ -1,6 +1,10 @@
 import {
   state,
-} from "../state/runtime-state.js";
+} from "../state/runtime-state";
+import type {
+  FrameContext,
+  RenderPlan,
+} from "../types";
 
 const BACKEND_CAPABILITIES = {
   webgpu: {
@@ -34,40 +38,44 @@ const LEGACY_PRESENTER_CAPABILITIES = {
   },
 };
 
-function supportsCapability(capability, frameContext) {
+function supportsCapability(capability: {
+  renderStyles: string[];
+  combineModes: string[];
+  displayModes: string[];
+  requiresSignedField?: boolean;
+}, frameContext: FrameContext): boolean {
   return capability.renderStyles.includes(frameContext.renderStyle) &&
     capability.combineModes.includes(frameContext.combineMode) &&
     capability.displayModes.includes(frameContext.displayMode) &&
     (!capability.requiresSignedField || frameContext.isSignedMode);
 }
 
-function resolveLegacyPresenter(frameContext) {
+function resolveLegacyPresenter(frameContext: FrameContext): "cpu" | "webgl" {
   if (frameContext.prefersLegacyWebGlPresentation && supportsCapability(LEGACY_PRESENTER_CAPABILITIES.webgl, frameContext)) {
     return "webgl";
   }
   return "cpu";
 }
 
-function resolveRenderPlan(frameContext) {
+function resolveRenderPlan(frameContext: FrameContext): RenderPlan {
   const backend = supportsCapability(BACKEND_CAPABILITIES.webgpu, frameContext)
     ? "webgpu"
     : "legacy";
   const legacyPresenter = resolveLegacyPresenter(frameContext);
-  const capability = backend === "webgpu"
-    ? BACKEND_CAPABILITIES.webgpu
-    : LEGACY_PRESENTER_CAPABILITIES[legacyPresenter];
 
   return {
     backend,
     capabilityKey: backend === "webgpu" ? "webgpu" : `legacy:${legacyPresenter}`,
     legacyPresenter,
     shouldAttemptGpuField: frameContext.shouldAttemptGpuField && (
-      backend === "webgpu" || capability.requiresGpuAccumulation || legacyPresenter === "cpu"
+      backend === "webgpu" ||
+      LEGACY_PRESENTER_CAPABILITIES[legacyPresenter].requiresGpuAccumulation ||
+      legacyPresenter === "cpu"
     ),
   };
 }
 
-function setActiveRenderPath(plan) {
+function setActiveRenderPath(plan: RenderPlan): void {
   state.activeRenderer = plan.backend;
   state.activePresentation = plan.backend === "webgpu"
     ? "native"

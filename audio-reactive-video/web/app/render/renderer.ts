@@ -2,48 +2,48 @@ import {
   canvas,
   ctx,
   gpuFieldValidation,
-} from "../state/context.js";
+} from "../state/context";
 import {
   state,
-} from "../state/runtime-state.js";
+} from "../state/runtime-state";
 import {
   beginFrameProfile,
   finishFrameProfile,
   profileSectionEnd,
   profileSectionStart,
   updateModeState,
-} from "../core/runtime.js";
+} from "../core/runtime";
 import {
   buildFrameContext,
-} from "./frame-state.js";
+} from "./frame-state";
 import {
   resolveRenderPlan,
   setActiveRenderPath,
-} from "./planner.js";
+} from "./planner";
 import {
   clearGpuPresentation,
-} from "./gpu.js";
+} from "./gpu";
 import {
   drawAtmosphereOverlay,
   drawGlowContours,
   drawIsolines,
   getIsolinePath,
-} from "./draw-helpers.js";
+} from "./draw-helpers";
 import {
   accumulateLegacyField,
   postprocessLegacyField,
-} from "./backends/legacy-backend.js";
+} from "./backends/legacy-backend";
 import {
   compositeLegacyScene,
   shadeFieldOnCpu,
-} from "./presenters/cpu-presenter.js";
+} from "./presenters/cpu-presenter";
 import {
   presentLegacyWithWebGl,
-} from "./presenters/webgl-presenter.js";
+} from "./presenters/webgl-presenter";
 import {
   clearWebGpuPresentation,
   renderSignedFieldWithWebGpu,
-} from "./webgpu.js";
+} from "./webgpu";
 
 function renderField() {
   const frameProfile = beginFrameProfile();
@@ -99,7 +99,9 @@ function renderField() {
   if (usedWebGpuMainPath) {
     setActiveRenderPath({
       backend: "webgpu",
+      capabilityKey: "webgpu",
       legacyPresenter: "cpu",
+      shouldAttemptGpuField: true,
     });
     clearGpuPresentation();
     ctx.clearRect(0, 0, canvas.width, canvas.height);

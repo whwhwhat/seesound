@@ -3,10 +3,10 @@ import {
   BESSEL_ZEROS,
   FFT_SIZE,
   fieldSize,
-} from "../state/constants.js";
+} from "../state/constants";
 import {
   numericControls,
-} from "../state/dom.js";
+} from "../state/dom";
 import {
   bandRangeCache,
   directGpuUnderlayCtx,
@@ -17,18 +17,23 @@ import {
   renderBuffers,
   spatialAtlasCache,
   spatialCache,
-} from "../state/render-resources.js";
+} from "../state/render-resources";
 import {
   state,
-} from "../state/runtime-state.js";
+} from "../state/runtime-state";
 import {
   besselJ,
   clamp,
   noise2D,
   smoothstep,
-} from "./utils.js";
+} from "./utils";
+import type {
+  BandRange,
+  DirectGpuUnderlayParams,
+  SpatialModeBundle,
+} from "../types";
 
-function initializeFieldGeometry() {
+function initializeFieldGeometry(): void {
   let ptr = 0;
   for (let y = 0; y < fieldSize; y += 1) {
     const nyField = y / fieldStride - 0.5;
@@ -51,7 +56,7 @@ function initializeFieldGeometry() {
   }
 }
 
-function updateDirectGpuUnderlay(field, displayScale, params) {
+function updateDirectGpuUnderlay(field: Float32Array, displayScale: number, params: DirectGpuUnderlayParams): void {
   const imageData = directGpuUnderlayImage.data;
   const shapeMask = params.plateShape === "circle" ? fieldGeometry.circleMask : fieldGeometry.squareMask;
   const spreadNorm = clamp(params.glowSpread / 2.5, 0.08, 4.0);
@@ -82,10 +87,10 @@ function updateDirectGpuUnderlay(field, displayScale, params) {
   directGpuUnderlayCtx.putImageData(directGpuUnderlayImage, 0, 0);
 }
 
-function getBandRanges(groups, sampleRate) {
+function getBandRanges(groups: number, sampleRate: number): BandRange[] {
   const key = `${groups}:${sampleRate}`;
   if (bandRangeCache.has(key)) {
-    return bandRangeCache.get(key);
+    return bandRangeCache.get(key) ?? [];
   }
 
   const minBin = 2;
@@ -107,7 +112,7 @@ function getBandRanges(groups, sampleRate) {
   return ranges;
 }
 
-function ensureInactiveBands(targetCount) {
+function ensureInactiveBands(targetCount: number): Float32Array {
   if (renderBuffers.inactiveBands.length !== targetCount) {
     renderBuffers.inactiveBands = new Float32Array(targetCount);
   } else {
@@ -116,7 +121,7 @@ function ensureInactiveBands(targetCount) {
   return renderBuffers.inactiveBands;
 }
 
-function resetRenderBuffers() {
+function resetRenderBuffers(): void {
   renderBuffers.field.fill(0);
   renderBuffers.colorWeight.fill(0);
   renderBuffers.colorAccum.fill(0);
@@ -127,7 +132,7 @@ function resetRenderBuffers() {
   renderBuffers.modeColor.fill(0);
 }
 
-function blurField(values, width, height, radius = 2) {
+function blurField(values: Float32Array, width: number, height: number, radius = 2): Float32Array {
   const temp = new Float32Array(values.length);
   const result = new Float32Array(values.length);
 
@@ -166,7 +171,7 @@ function blurField(values, width, height, radius = 2) {
   return result;
 }
 
-function circleModeValue(n, m, radius, theta, angularRotationDegrees = 0) {
+function circleModeValue(n: number, m: number, radius: number, theta: number, angularRotationDegrees = 0): number {
   const zeros = BESSEL_ZEROS[n];
   if (!zeros || !zeros[m - 1]) {
     return 0;
@@ -179,13 +184,13 @@ function circleModeValue(n, m, radius, theta, angularRotationDegrees = 0) {
   return radial * angular;
 }
 
-function getSpatialMode(m, n) {
+function getSpatialMode(m: number, n: number): SpatialModeBundle {
   const angularRotation = state.plateShape === "circle"
     ? numericControls.angularRotation
     : 0;
   const key = `${state.plateShape}:${m}:${n}:${angularRotation.toFixed(2)}`;
   if (spatialCache.has(key)) {
-    return spatialCache.get(key);
+    return spatialCache.get(key) ?? { sharp: new Float32Array(fieldCellCount), blurred: new Float32Array(fieldCellCount) };
   }
 
   const sharp = new Float32Array(fieldCellCount);
@@ -212,7 +217,7 @@ function getSpatialMode(m, n) {
   return bundle;
 }
 
-function getSpatialAtlasKey() {
+function getSpatialAtlasKey(): string {
   const angularRotation = state.plateShape === "circle" ? numericControls.angularRotation.toFixed(2) : "0.00";
   return `${state.plateShape}:${angularRotation}:${state.modeState.length}`;
 }
@@ -242,8 +247,8 @@ function ensureSpatialAtlas() {
   return spatialAtlasCache;
 }
 
-function percentileOfField(field, q, requireCircleInterior = false) {
-  const values = [];
+function percentileOfField(field: Float32Array, q: number, requireCircleInterior = false): number {
+  const values: number[] = [];
   for (let ptr = 0; ptr < field.length; ptr += 1) {
     if (requireCircleInterior && fieldGeometry.circleInteriorMask[ptr] === 0) {
       continue;
@@ -258,7 +263,7 @@ function percentileOfField(field, q, requireCircleInterior = false) {
   return values[index];
 }
 
-function removeRadialAverage(field) {
+function removeRadialAverage(field: Float32Array): void {
   const bucketCount = Math.max(32, Math.floor(fieldSize * 0.7));
   const sums = new Float32Array(bucketCount);
   const counts = new Float32Array(bucketCount);
@@ -282,7 +287,7 @@ function removeRadialAverage(field) {
   }
 }
 
-function clearSpatialCache() {
+function clearSpatialCache(): void {
   spatialCache.clear();
 }
 

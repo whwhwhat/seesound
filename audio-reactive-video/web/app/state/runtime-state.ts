@@ -1,8 +1,13 @@
 import {
   THEME_PRESETS,
-} from "./constants.js";
+} from "./constants";
+import type {
+  AppState,
+  ProfilerState,
+  RendererFlags,
+} from "../types";
 
-function readProfilePreference() {
+function readProfilePreference(): boolean {
   try {
     return window.localStorage.getItem("arv_profile") === "1";
   } catch {
@@ -10,7 +15,7 @@ function readProfilePreference() {
   }
 }
 
-function writeProfilePreference(enabled) {
+function writeProfilePreference(enabled: boolean): void {
   try {
     window.localStorage.setItem("arv_profile", enabled ? "1" : "0");
   } catch {
@@ -18,7 +23,7 @@ function writeProfilePreference(enabled) {
   }
 }
 
-function readDirectGpuPreference() {
+function readDirectGpuPreference(): boolean {
   try {
     return window.localStorage.getItem("arv_direct_gpu") === "1";
   } catch {
@@ -26,7 +31,7 @@ function readDirectGpuPreference() {
   }
 }
 
-function writeDirectGpuPreference(enabled) {
+function writeDirectGpuPreference(enabled: boolean): void {
   try {
     window.localStorage.setItem("arv_direct_gpu", enabled ? "1" : "0");
   } catch {
@@ -34,14 +39,14 @@ function writeDirectGpuPreference(enabled) {
   }
 }
 
-const rendererFlags = {
+const rendererFlags: RendererFlags = {
   directGpuPresentation:
     new URLSearchParams(window.location.search).get("directGpu") === "1" ||
     window.location.hash.includes("direct-gpu") ||
     readDirectGpuPreference(),
 };
 
-const profiler = {
+const profiler: ProfilerState = {
   enabled:
     new URLSearchParams(window.location.search).get("profile") === "1" ||
     window.location.hash.includes("profile") ||
@@ -68,7 +73,7 @@ const profiler = {
   ],
 };
 
-const state = {
+const state: AppState = {
   audioContext: null,
   analyser: null,
   sourceNode: null,

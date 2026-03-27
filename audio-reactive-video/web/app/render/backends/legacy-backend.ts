@@ -1,20 +1,26 @@
 import {
   state,
-} from "../../state/context.js";
+} from "../../state/context";
 import {
   getSpatialMode,
   percentileOfField,
   removeRadialAverage,
-} from "../../core/geometry.js";
+} from "../../core/geometry";
 import {
   readGpuFieldIntoCpuBuffer,
   readGpuGlowAccumulation,
   runGpuFieldAccumulation,
   shouldValidateGpuField,
   validateGpuFieldAgainstCpu,
-} from "../gpu.js";
+} from "../gpu";
+import type {
+  FrameContext,
+  FrameProfileTools,
+  RenderPlan,
+  RGBColor,
+} from "../../types";
 
-function accumulateFieldOnCpu(frameContext) {
+function accumulateFieldOnCpu(frameContext: FrameContext): void {
   const {
     colorAccum,
     colorWeight,
@@ -32,7 +38,7 @@ function accumulateFieldOnCpu(frameContext) {
     const modeContribution = modeRenderState.contribution[index];
     const sharpMix = modeRenderState.sharpMix[index];
     const blurredMix = modeRenderState.blurMix[index];
-    const modeColor = useGlowColor
+    const modeColor: RGBColor | null = useGlowColor
       ? [
         modeRenderState.color[index * 3],
         modeRenderState.color[index * 3 + 1],
@@ -58,7 +64,7 @@ function accumulateFieldOnCpu(frameContext) {
   }
 }
 
-function resolveDisplayScale(field, isSingleMode) {
+function resolveDisplayScale(field: Float32Array, isSingleMode: boolean): number {
   let maxAbs = 1e-6;
   for (let ptr = 0; ptr < field.length; ptr += 1) {
     maxAbs = Math.max(maxAbs, Math.abs(field[ptr]));
@@ -66,7 +72,7 @@ function resolveDisplayScale(field, isSingleMode) {
   return isSingleMode ? 1 : maxAbs;
 }
 
-function accumulateLegacyField(frameContext, renderPlan, frameProfileTools) {
+function accumulateLegacyField(frameContext: FrameContext, renderPlan: RenderPlan, frameProfileTools: FrameProfileTools) {
   const {
     colorAccum,
     colorWeight,
@@ -115,7 +121,11 @@ function accumulateLegacyField(frameContext, renderPlan, frameProfileTools) {
   };
 }
 
-function postprocessLegacyField(frameContext, hasCpuFieldData, frameProfileTools) {
+function postprocessLegacyField(
+  frameContext: FrameContext,
+  hasCpuFieldData: boolean,
+  frameProfileTools: FrameProfileTools,
+): void {
   if (!hasCpuFieldData) {
     return;
   }

@@ -2,25 +2,25 @@ import {
   controls,
   numericControls,
   state,
-} from "./state/context.js";
+} from "./state/context";
 import {
   buildModes,
   syncControlVisibility,
   syncThemeInputs,
   updateModeLabel,
-} from "./core/runtime.js";
+} from "./core/runtime";
 import {
   bindEventHandlers,
-} from "./ui/events.js";
+} from "./ui/events";
 import {
   initializeFieldGeometry,
-} from "./core/geometry.js";
+} from "./core/geometry";
 import {
   primeWebGpuRenderer,
-} from "./render/webgpu.js";
+} from "./render/webgpu";
 import {
   requestRender,
-} from "./render/renderer.js";
+} from "./render/renderer";
 
 initializeFieldGeometry();
 syncThemeInputs();

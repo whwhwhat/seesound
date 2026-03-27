@@ -1,28 +1,43 @@
 import {
   fieldSize,
-} from "./constants.js";
+} from "./constants";
+import type {
+  BandRange,
+  FieldGeometry,
+  RenderBuffers,
+  SpatialAtlasCache,
+  SpatialModeBundle,
+} from "../types";
+
+function requireCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Unable to create offscreen 2D canvas context.");
+  }
+  return context;
+}
 
 const fieldCanvas = document.createElement("canvas");
 fieldCanvas.width = fieldSize;
 fieldCanvas.height = fieldSize;
-const fieldCtx = fieldCanvas.getContext("2d");
+const fieldCtx = requireCanvasContext(fieldCanvas);
 const fieldImage = fieldCtx.createImageData(fieldSize, fieldSize);
 
 const directGpuUnderlayCanvas = document.createElement("canvas");
 directGpuUnderlayCanvas.width = fieldSize;
 directGpuUnderlayCanvas.height = fieldSize;
-const directGpuUnderlayCtx = directGpuUnderlayCanvas.getContext("2d");
+const directGpuUnderlayCtx = requireCanvasContext(directGpuUnderlayCanvas);
 const directGpuUnderlayImage = directGpuUnderlayCtx.createImageData(fieldSize, fieldSize);
 
 const glowCanvas = document.createElement("canvas");
 glowCanvas.width = 2048;
 glowCanvas.height = 2048;
-const glowCtx = glowCanvas.getContext("2d");
+const glowCtx = requireCanvasContext(glowCanvas);
 
 const fieldCellCount = fieldSize * fieldSize;
 const fieldStride = fieldSize - 1;
 
-const renderBuffers = {
+const renderBuffers: RenderBuffers = {
   field: new Float32Array(fieldCellCount),
   colorWeight: new Float32Array(fieldCellCount),
   colorAccum: new Float32Array(fieldCellCount * 3),
@@ -35,7 +50,7 @@ const renderBuffers = {
   gpuFieldReadback: new Float32Array(fieldCellCount * 4),
 };
 
-const fieldGeometry = {
+const fieldGeometry: FieldGeometry = {
   nx: new Float32Array(fieldCellCount),
   ny: new Float32Array(fieldCellCount),
   modeRadius: new Float32Array(fieldCellCount),
@@ -45,18 +60,18 @@ const fieldGeometry = {
   dither: new Float32Array(fieldCellCount),
 };
 
-const bandRangeCache = new Map();
+const bandRangeCache = new Map<string, BandRange[]>();
 const contourPathCache = {
   key: "",
-  path: null,
+  path: null as Path2D | null,
 };
-const spatialAtlasCache = {
+const spatialAtlasCache: SpatialAtlasCache = {
   key: "",
   sharp: new Float32Array(),
   blurred: new Float32Array(),
   modeCount: 0,
 };
-const spatialCache = new Map();
+const spatialCache = new Map<string, SpatialModeBundle>();
 
 export {
   bandRangeCache,

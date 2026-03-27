@@ -17,5 +17,9 @@
 __pycache__/
 *.pyc
 
+# web tooling
+node_modules/
+dist/
+
 # generated assets
 audio-reactive-video/.arv-output/

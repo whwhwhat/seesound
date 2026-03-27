@@ -1,6 +1,12 @@
+import type {
+  RGBColor,
+  ThemeKey,
+  ThemePreset,
+} from "../types";
+
 const fieldSize = 384;
 const FFT_SIZE = 2048;
-const BESSEL_ZEROS = {
+const BESSEL_ZEROS: Record<number, number[]> = {
   0: [2.4048, 5.5201, 8.6537],
   1: [3.8317, 7.0156, 10.1735],
   2: [5.1356, 8.4172, 11.6198],
@@ -11,7 +17,7 @@ const BESSEL_ZEROS = {
   7: [11.0864, 14.8213, 18.2883],
   8: [12.2251, 16.0378, 19.5576],
 };
-const THEME_PRESETS = {
+const THEME_PRESETS: Record<ThemeKey, ThemePreset> = {
   lab: {
     low: [108, 122, 43],
     mid: [188, 222, 72],
@@ -38,7 +44,7 @@ const THEME_PRESETS = {
     high: [232, 240, 235],
   },
 };
-const BASE_BG_COLOR = [2, 6, 9];
+const BASE_BG_COLOR: RGBColor = [2, 6, 9];
 const COLOR_FOCUS_LOW_HZ = 60;
 const COLOR_FOCUS_HIGH_HZ = 6000;
 

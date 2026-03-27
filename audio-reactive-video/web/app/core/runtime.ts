@@ -5,7 +5,7 @@ import {
   COLOR_FOCUS_LOW_HZ,
   FFT_SIZE,
   THEME_PRESETS,
-} from "../state/constants.js";
+} from "../state/constants";
 import {
   adaptiveColorMixWrap,
   angularRotationWrap,
@@ -33,16 +33,16 @@ import {
   singleModeWrap,
   themeSelect,
   themeWrap,
-} from "../state/dom.js";
+} from "../state/dom";
 import {
   profiler,
   rendererFlags,
   state,
   writeProfilePreference,
-} from "../state/runtime-state.js";
+} from "../state/runtime-state";
 import {
   renderBuffers,
-} from "../state/render-resources.js";
+} from "../state/render-resources";
 import {
   clamp,
   lerp,
@@ -50,11 +50,21 @@ import {
   mixColor3,
   rgbToHex,
   toMel,
-} from "./utils.js";
+} from "./utils";
 import {
   ensureInactiveBands,
   getBandRanges,
-} from "./geometry.js";
+} from "./geometry";
+import type {
+  AudioFrame,
+  BandRange,
+  FrameProfile,
+  ModeRenderState,
+  ModeState,
+  RGBColor,
+  ThemeGlowPalette,
+  ThemeKey,
+} from "../types";
 
 function ensureProfilerOverlay() {
   if (!profiler.enabled) {
@@ -95,7 +105,7 @@ function resetProfilerSamples() {
   }
 }
 
-function setProfilerEnabled(enabled) {
+function setProfilerEnabled(enabled: boolean): void {
   profiler.enabled = enabled;
   writeProfilePreference(enabled);
   if (!enabled) {
@@ -106,7 +116,7 @@ function setProfilerEnabled(enabled) {
   ensureProfilerOverlay();
 }
 
-function beginFrameProfile() {
+function beginFrameProfile(): FrameProfile | null {
   if (!profiler.enabled) {
     return null;
   }
@@ -117,18 +127,18 @@ function beginFrameProfile() {
   };
 }
 
-function profileSectionStart(frameProfile) {
+function profileSectionStart(frameProfile: FrameProfile | null): number {
   return frameProfile ? performance.now() : 0;
 }
 
-function profileSectionEnd(frameProfile, name, startTime) {
+function profileSectionEnd(frameProfile: FrameProfile | null, name: string, startTime: number): void {
   if (!frameProfile) {
     return;
   }
   frameProfile.sections[name] = (frameProfile.sections[name] || 0) + (performance.now() - startTime);
 }
 
-function finishFrameProfile(frameProfile) {
+function finishFrameProfile(frameProfile: FrameProfile | null): void {
   if (!frameProfile) {
     return;
   }
@@ -160,15 +170,15 @@ function finishFrameProfile(frameProfile) {
   profiler.overlay.textContent = lines.join("\n");
 }
 
-function buildModes(count) {
+function buildModes(count: number): ModeState[] {
   if (state.plateShape === "circle") {
     return buildCircleModes(count);
   }
   return buildSquareModes(count);
 }
 
-function buildSquareModes(count) {
-  const pairs = [];
+function buildSquareModes(count: number): ModeState[] {
+  const pairs: Array<[number, number]> = [];
   for (let order = 2; pairs.length < count * 2 && order <= 16; order += 1) {
     for (let m = 1; m < order; m += 1) {
       const n = order - m;
@@ -179,7 +189,7 @@ function buildSquareModes(count) {
     }
   }
 
-  const modes = [];
+  const modes: ModeState[] = [];
   for (let index = 0; index < count; index += 1) {
     const [m, n] = pairs[index % pairs.length];
     modes.push({
@@ -194,8 +204,8 @@ function buildSquareModes(count) {
   return modes;
 }
 
-function buildCircleModes(count) {
-  const pairs = [];
+function buildCircleModes(count: number): ModeState[] {
+  const pairs: Array<{ n: number; m: number; zero: number }> = [];
   for (let radial = 1; radial <= 3; radial += 1) {
     for (let angular = 0; angular <= 8; angular += 1) {
       if (!BESSEL_ZEROS[angular] || !BESSEL_ZEROS[angular][radial - 1]) {
@@ -210,7 +220,7 @@ function buildCircleModes(count) {
   }
   pairs.sort((a, b) => a.zero - b.zero || a.n - b.n || a.m - b.m);
 
-  const modes = [];
+  const modes: ModeState[] = [];
   for (let index = 0; index < count; index += 1) {
     const { n, m } = pairs[index % pairs.length];
     modes.push({
@@ -225,9 +235,14 @@ function buildCircleModes(count) {
   return modes;
 }
 
-function getBandRange(groupIndex, groups, sampleRate) {
+function getBandRange(groupIndex: number, groups: number, sampleRate: number): BandRange {
   const ranges = getBandRanges(groups, sampleRate);
-  return ranges[Math.max(0, Math.min(ranges.length - 1, groupIndex))];
+  return ranges[Math.max(0, Math.min(ranges.length - 1, groupIndex))] ?? {
+    start: 0,
+    end: 0,
+    lowHz: 0,
+    highHz: 0,
+  };
 }
 
 function updateModeLabel() {
@@ -280,7 +295,7 @@ function syncThemeInputs() {
   themeSelect.value = state.activeTheme;
 }
 
-function applyTheme(themeKey) {
+function applyTheme(themeKey: ThemeKey): void {
   const preset = THEME_PRESETS[themeKey];
   if (!preset) {
     return;
@@ -292,7 +307,7 @@ function applyTheme(themeKey) {
   syncThemeInputs();
 }
 
-function getModeBaseColor(groupIndex, groups, sampleRate, themePalette) {
+function getModeBaseColor(groupIndex: number, groups: number, sampleRate: number, themePalette: ThemeGlowPalette): RGBColor {
   const adaptiveMix = numericControls.adaptiveColorMix;
   const separation = numericControls.colorSeparation;
   const { lowHz, highHz } = getBandRange(groupIndex, groups, sampleRate);
@@ -324,11 +339,11 @@ function getModeBaseColor(groupIndex, groups, sampleRate, themePalette) {
   return lerpColor(themePalette.baseColor, paletteColor, 1 - neutralMix);
 }
 
-function getThemeLineColor() {
+function getThemeLineColor(): RGBColor {
   return lerpColor(state.midBandColor, state.highBandColor, 0.35);
 }
 
-function getThemeGlowPalette() {
+function getThemeGlowPalette(): ThemeGlowPalette {
   const lineColor = getThemeLineColor();
   const baseColor = lerpColor(lineColor, state.highBandColor, 0.22);
   const outerColor = lerpColor(state.lowBandColor, lineColor, 0.5);
@@ -345,7 +360,7 @@ function getThemeGlowPalette() {
   };
 }
 
-function ensureAudioGraph() {
+function ensureAudioGraph(): void {
   if (state.audioContext) {
     return;
   }
@@ -363,7 +378,12 @@ function ensureAudioGraph() {
   updateModeLabel();
 }
 
-function buildModeRenderState(sampleRate, themePalette, singleModeIndex, isSingleMode) {
+function buildModeRenderState(
+  sampleRate: number,
+  themePalette: ThemeGlowPalette,
+  singleModeIndex: number,
+  isSingleMode: boolean,
+): ModeRenderState {
   const modeContribution = renderBuffers.modeContribution;
   const modeSharpMix = renderBuffers.modeSharpMix;
   const modeBlurMix = renderBuffers.modeBlurMix;
@@ -404,13 +424,17 @@ function buildModeRenderState(sampleRate, themePalette, singleModeIndex, isSingl
   };
 }
 
-function groupBands(data, groups) {
+function groupBands(data: Uint8Array, groups: number): Float32Array {
   const values = new Float32Array(groups);
   const sampleRate = state.audioContext?.sampleRate ?? 48000;
   const ranges = getBandRanges(groups, sampleRate);
 
   for (let group = 0; group < groups; group += 1) {
-    const { start, end } = ranges[group];
+    const range = ranges[group];
+    if (!range) {
+      continue;
+    }
+    const { start, end } = range;
     let sum = 0;
     for (let index = start; index < end; index += 1) {
       sum += data[index] / 255;
@@ -421,7 +445,7 @@ function groupBands(data, groups) {
   return values;
 }
 
-function updateModeState() {
+function updateModeState(): AudioFrame {
   const targetCount = Math.round(numericControls.modeCount);
   if (state.modeState.length !== targetCount) {
     state.modeState = buildModes(targetCount);
@@ -441,10 +465,15 @@ function updateModeState() {
     return { bands: ensureInactiveBands(targetCount), rms: 0, centroid: 0, isPlaying: false };
   }
 
-  state.analyser.getByteFrequencyData(state.freqData);
-  state.analyser.getByteTimeDomainData(state.timeData);
+  const freqData = (state.freqData ?? new Uint8Array(state.analyser.frequencyBinCount)) as Uint8Array<ArrayBuffer>;
+  const timeData = (state.timeData ?? new Uint8Array(state.analyser.fftSize)) as Uint8Array<ArrayBuffer>;
+  state.freqData = freqData;
+  state.timeData = timeData;
 
-  const bands = groupBands(state.freqData, targetCount);
+  state.analyser.getByteFrequencyData(freqData);
+  state.analyser.getByteTimeDomainData(timeData);
+
+  const bands = groupBands(freqData, targetCount);
   if (state.bandProfile.length !== targetCount) {
     state.bandProfile = new Float32Array(targetCount);
   }
@@ -456,8 +485,8 @@ function updateModeState() {
   let centroidAccum = 0;
   let energyAccum = 0;
 
-  for (let index = 0; index < state.timeData.length; index += 1) {
-    const centered = (state.timeData[index] - 128) / 128;
+  for (let index = 0; index < timeData.length; index += 1) {
+    const centered = (timeData[index] - 128) / 128;
     rmsAccum += centered * centered;
   }
 
@@ -469,7 +498,7 @@ function updateModeState() {
 
   return {
     bands,
-    rms: Math.sqrt(rmsAccum / state.timeData.length),
+    rms: Math.sqrt(rmsAccum / timeData.length),
     centroid: energyAccum > 1e-6 ? centroidAccum / energyAccum / bands.length : 0,
     isPlaying: true,
   };

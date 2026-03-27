@@ -6,14 +6,14 @@ import {
   FFT_SIZE,
   THEME_PRESETS,
   fieldSize,
-} from "./constants.js";
+} from "./constants";
 import {
   profiler,
   rendererFlags,
   state,
   writeDirectGpuPreference,
   writeProfilePreference,
-} from "./runtime-state.js";
+} from "./runtime-state";
 import {
   adaptiveColorMixWrap,
   angularRotationWrap,
@@ -54,7 +54,7 @@ import {
   themeSelect,
   themeWrap,
   wgpuCanvas,
-} from "./dom.js";
+} from "./dom";
 import {
   bandRangeCache,
   contourPathCache,
@@ -72,7 +72,7 @@ import {
   renderBuffers,
   spatialAtlasCache,
   spatialCache,
-} from "./render-resources.js";
+} from "./render-resources";
 import {
   GPU_FIELD_FRAGMENT_SHADER,
   GPU_FIELD_VERTEX_SHADER,
@@ -81,7 +81,7 @@ import {
   gpuFieldPipeline,
   gpuFieldValidation,
   gpuShadePipeline,
-} from "./gpu-state.js";
+} from "./gpu-state";
 
 export {
   BASE_BG_COLOR,

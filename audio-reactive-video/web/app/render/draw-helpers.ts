@@ -1,40 +1,54 @@
 import {
   BASE_BG_COLOR,
   fieldSize,
-} from "../state/constants.js";
+} from "../state/constants";
 import {
   canvas,
   ctx,
   numericControls,
-} from "../state/dom.js";
+} from "../state/dom";
 import {
   contourPathCache,
   fieldGeometry,
   fieldStride,
   glowCanvas,
   glowCtx,
-} from "../state/render-resources.js";
+} from "../state/render-resources";
 import {
   state,
-} from "../state/runtime-state.js";
+} from "../state/runtime-state";
 import {
   getThemeLineColor,
-} from "../core/runtime.js";
+} from "../core/runtime";
 import {
   clamp,
   lerp,
   lerpColor,
   toRgba,
-} from "../core/utils.js";
+} from "../core/utils";
+import type {
+  RGBColor,
+  ThemeGlowPalette,
+} from "../types";
+
+function requireCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Unable to create atmosphere noise context.");
+  }
+  return context;
+}
+
+type Point = [number, number];
 
 const atmosphereNoiseCanvas = document.createElement("canvas");
 atmosphereNoiseCanvas.width = fieldSize;
 atmosphereNoiseCanvas.height = fieldSize;
-const atmosphereNoiseCtx = atmosphereNoiseCanvas.getContext("2d");
+const atmosphereNoiseCtx = requireCanvasContext(atmosphereNoiseCanvas);
 const atmosphereNoiseImage = atmosphereNoiseCtx.createImageData(fieldSize, fieldSize);
 let atmosphereNoiseReady = false;
 
-function ensureAtmosphereNoiseTexture() {
+function ensureAtmosphereNoiseTexture(): void {
   if (atmosphereNoiseReady) {
     return;
   }
@@ -51,7 +65,7 @@ function ensureAtmosphereNoiseTexture() {
   atmosphereNoiseReady = true;
 }
 
-function drawAtmosphereOverlay(themePalette) {
+function drawAtmosphereOverlay(themePalette: ThemeGlowPalette): void {
   const gradient = ctx.createRadialGradient(
     canvas.width / 2,
     canvas.height / 2,
@@ -76,13 +90,21 @@ function drawAtmosphereOverlay(themePalette) {
   ctx.restore();
 }
 
-function interpolatePoint(ax, ay, av, bx, by, bv) {
+function interpolatePoint(ax: number, ay: number, av: number, bx: number, by: number, bv: number): Point {
   const denom = bv - av;
   const t = Math.abs(denom) < 1e-6 ? 0.5 : (0 - av) / denom;
   return [lerp(ax, bx, t), lerp(ay, by, t)];
 }
 
-function appendIsolineSegment(path, p0, p1, scale, inset, drawSize, smoothed) {
+function appendIsolineSegment(
+  path: Path2D,
+  p0: Point,
+  p1: Point,
+  scale: number,
+  inset: number,
+  drawSize: number,
+  smoothed: boolean,
+): void {
   const x0 = inset + (p0[0] / scale) * drawSize;
   const y0 = inset + (p0[1] / scale) * drawSize;
   const x1 = inset + (p1[0] / scale) * drawSize;
@@ -98,7 +120,13 @@ function appendIsolineSegment(path, p0, p1, scale, inset, drawSize, smoothed) {
   path.quadraticCurveTo(mx, my, x1, y1);
 }
 
-function buildIsolinePath(field, displayScale, inset, drawSize, smoothed = false) {
+function buildIsolinePath(
+  field: Float32Array,
+  displayScale: number,
+  inset: number,
+  drawSize: number,
+  smoothed = false,
+): Path2D {
   const normalizedScale = Math.max(displayScale, 1e-6);
   const path = new Path2D();
   const rimCutoff = state.plateShape === "circle" ? fieldSize * 0.015 : -1;
@@ -119,7 +147,7 @@ function buildIsolinePath(field, displayScale, inset, drawSize, smoothed = false
       const br = field[(y + 1) * fieldSize + x + 1] / normalizedScale;
       const bl = field[(y + 1) * fieldSize + x] / normalizedScale;
 
-      const points = [];
+      const points: Point[] = [];
       if ((tl <= 0 && tr > 0) || (tl > 0 && tr <= 0)) {
         points.push(interpolatePoint(x, y, tl, x + 1, y, tr));
       }
@@ -146,21 +174,27 @@ function buildIsolinePath(field, displayScale, inset, drawSize, smoothed = false
   return path;
 }
 
-function getIsolinePath(field, displayScale, inset, drawSize, smoothed = false) {
+function getIsolinePath(
+  field: Float32Array,
+  displayScale: number,
+  inset: number,
+  drawSize: number,
+  smoothed = false,
+): Path2D {
   const key = `${displayScale.toFixed(6)}:${inset.toFixed(3)}:${drawSize.toFixed(3)}:${smoothed ? 1 : 0}`;
   if (contourPathCache.key !== key) {
     contourPathCache.key = key;
     contourPathCache.path = buildIsolinePath(field, displayScale, inset, drawSize, smoothed);
   }
-  return contourPathCache.path;
+  return contourPathCache.path ?? new Path2D();
 }
 
-function strokePath(ctxTarget, path) {
+function strokePath(ctxTarget: CanvasRenderingContext2D, path: Path2D): void {
   ctxTarget.beginPath();
   ctxTarget.stroke(path);
 }
 
-function drawIsolines(path, ampGate, drawSize) {
+function drawIsolines(path: Path2D, ampGate: number, drawSize: number): void {
   const thresholdAlpha = Math.max(0.12, ampGate);
   const lineColor = getThemeLineColor();
   const shadowColor = lerpColor(lineColor, state.highBandColor, 0.45);
@@ -178,7 +212,13 @@ function drawIsolines(path, ampGate, drawSize) {
   ctx.restore();
 }
 
-function drawGlowContours(path, drawSize, ampGate, glowColor, themePalette) {
+function drawGlowContours(
+  path: Path2D,
+  drawSize: number,
+  ampGate: number,
+  glowColor: RGBColor,
+  themePalette: ThemeGlowPalette,
+): void {
   const alpha = Math.max(0.1, ampGate);
   const thickness = numericControls.glowThickness;
   const spread = numericControls.glowSpread;

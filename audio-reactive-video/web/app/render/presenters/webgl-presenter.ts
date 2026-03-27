@@ -1,10 +1,10 @@
 import {
   numericControls,
   state,
-} from "../../state/context.js";
+} from "../../state/context";
 import {
   updateDirectGpuUnderlay,
-} from "../../core/geometry.js";
+} from "../../core/geometry";
 import {
   readGpuFieldIntoCpuBuffer,
   readGpuGlowAccumulation,
@@ -12,12 +12,20 @@ import {
   setGpuCanvasPresentation,
   setGpuCanvasVisible,
   shadeFieldOnGpu,
-} from "../gpu.js";
+} from "../gpu";
 import {
   resolveDisplayScale,
-} from "../backends/legacy-backend.js";
+} from "../backends/legacy-backend";
+import type {
+  FrameContext,
+  FrameProfileTools,
+  WebGlPresentationState,
+} from "../../types";
 
-function presentLegacyWithWebGl(frameContext, frameProfileTools) {
+function presentLegacyWithWebGl(
+  frameContext: FrameContext,
+  frameProfileTools: FrameProfileTools,
+): WebGlPresentationState {
   const {
     backgroundWeight,
     centroid,

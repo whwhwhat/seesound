@@ -18,13 +18,13 @@ import {
   themeSelect,
   glCanvas,
   wgpuCanvas,
-} from "../state/dom.js";
+} from "../state/dom";
 import {
   profiler,
   rendererFlags,
   state,
   writeDirectGpuPreference,
-} from "../state/runtime-state.js";
+} from "../state/runtime-state";
 import {
   applyTheme,
   buildModes,
@@ -33,25 +33,29 @@ import {
   syncControlVisibility,
   syncThemeInputs,
   updateModeLabel,
-} from "../core/runtime.js";
+} from "../core/runtime";
 import {
   clearSpatialCache,
-} from "../core/geometry.js";
+} from "../core/geometry";
 import {
   clearGpuPresentation,
   setGpuCanvasFrame,
-} from "../render/gpu.js";
+} from "../render/gpu";
 import {
   handleWebGpuResize,
-} from "../render/webgpu.js";
+} from "../render/webgpu";
 import {
   requestRender,
   startAnimationLoop,
   stopAnimationLoop,
-} from "../render/renderer.js";
+} from "../render/renderer";
 import {
   hexToRgb,
-} from "../core/utils.js";
+} from "../core/utils";
+import type {
+  CombineMode,
+  ThemeKey,
+} from "../types";
 
 let eventsBound = false;
 
@@ -164,7 +168,7 @@ function bindEventHandlers() {
   });
 
   combineModeSelect.addEventListener("input", () => {
-    state.combineMode = combineModeSelect.value;
+    state.combineMode = combineModeSelect.value as CombineMode;
     if (state.displayMode === "sum") {
       statusNode.textContent =
         state.combineMode === "signed"
@@ -199,7 +203,7 @@ function bindEventHandlers() {
       requestRender();
       return;
     }
-    applyTheme(themeSelect.value);
+    applyTheme(themeSelect.value as ThemeKey);
     requestRender();
   });
 
@@ -216,7 +220,9 @@ function bindEventHandlers() {
 
   audio.addEventListener("play", async () => {
     ensureAudioGraph();
-    await state.audioContext.resume();
+    if (state.audioContext) {
+      await state.audioContext.resume();
+    }
     statusNode.textContent = "Running realtime resonance preview.";
     startAnimationLoop();
   });

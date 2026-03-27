@@ -1,8 +1,13 @@
 import {
   fieldSize,
-} from "./constants.js";
+} from "./constants";
+import type {
+  GpuFieldPipelineState,
+  GpuFieldValidationState,
+  GpuShadePipelineState,
+} from "../types";
 
-const gpuShadePipeline = {
+const gpuShadePipeline: GpuShadePipelineState = {
   program: null,
   positionBuffer: null,
   ditherTexture: null,
@@ -12,14 +17,14 @@ const gpuShadePipeline = {
   available: false,
 };
 
-const gpuFieldValidation = {
+const gpuFieldValidation: GpuFieldValidationState = {
   frame: 0,
   lastComparedFrame: -1,
   maxAbsDiff: 0,
   meanAbsDiff: 0,
 };
 
-const gpuFieldPipeline = {
+const gpuFieldPipeline: GpuFieldPipelineState = {
   gl: null,
   available: false,
   program: null,

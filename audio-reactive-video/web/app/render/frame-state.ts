@@ -1,30 +1,35 @@
 import {
   audio,
   numericControls,
-} from "../state/dom.js";
+} from "../state/dom";
 import {
   contourPathCache,
   fieldImage,
   renderBuffers,
-} from "../state/render-resources.js";
+} from "../state/render-resources";
 import {
   rendererFlags,
   state,
-} from "../state/runtime-state.js";
+} from "../state/runtime-state";
 import {
   buildModeRenderState,
   getThemeGlowPalette,
-} from "../core/runtime.js";
+} from "../core/runtime";
 import {
   ensureSpatialAtlas,
   resetRenderBuffers,
-} from "../core/geometry.js";
+} from "../core/geometry";
 import {
   clamp,
   lerpColor,
-} from "../core/utils.js";
+} from "../core/utils";
+import type {
+  AudioFrame,
+  FrameContext,
+  RGBColor,
+} from "../types";
 
-function updateModeDynamics(bands, rms, centroid) {
+function updateModeDynamics(bands: Float32Array, rms: number, centroid: number): void {
   const coupling = numericControls.coupling;
   const persistence = numericControls.persistence;
   const motion = numericControls.motion;
@@ -42,7 +47,7 @@ function updateModeDynamics(bands, rms, centroid) {
   }
 }
 
-function buildFrameContext(audioFrame) {
+function buildFrameContext(audioFrame: AudioFrame): FrameContext {
   const {
     bands,
     centroid,
@@ -80,7 +85,7 @@ function buildFrameContext(audioFrame) {
 
   let activeSingleAmp = 0;
   let sceneColorWeight = 0;
-  const sceneColorAccum = [0, 0, 0];
+  const sceneColorAccum: RGBColor = [0, 0, 0];
 
   for (let index = 0; index < state.modeState.length; index += 1) {
     if (modeRenderState.enabled[index] === 0) {
@@ -120,7 +125,7 @@ function buildFrameContext(audioFrame) {
     ? 0.03 + (1 - singleFocus) * 0.18
     : 0.12;
   const singleModeBlur = isSingleMode ? (1 - singleFocus) * 12 : 0;
-  const averageGlowColor =
+  const averageGlowColor: RGBColor =
     sceneColorWeight > 1e-6
       ? [
         sceneColorAccum[0] / sceneColorWeight,

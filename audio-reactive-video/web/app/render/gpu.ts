@@ -1,9 +1,5 @@
 import {
   BASE_BG_COLOR,
-  GPU_FIELD_FRAGMENT_SHADER,
-  GPU_FIELD_VERTEX_SHADER,
-  GPU_SHADE_FRAGMENT_SHADER,
-  GPU_SHADE_VERTEX_SHADER,
   canvas,
   fieldCellCount,
   fieldGeometry,
@@ -15,12 +11,12 @@ import {
   renderBuffers,
   state,
 } from "../state/context";
+import GPU_FIELD_FRAGMENT_SHADER from "../shaders/glsl/gpu-field.frag.glsl?raw";
+import GPU_FIELD_VERTEX_SHADER from "../shaders/glsl/gpu-field.vert.glsl?raw";
+import GPU_SHADE_FRAGMENT_SHADER from "../shaders/glsl/gpu-shade.frag.glsl?raw";
+import GPU_SHADE_VERTEX_SHADER from "../shaders/glsl/gpu-shade.vert.glsl?raw";
 import type {
-  GpuFieldPipelineState,
-  GpuFieldPipelineUniforms,
   GpuShadeParams,
-  GpuShadePipelineState,
-  GpuShadePipelineUniforms,
   InitializedGpuFieldPipeline,
   InitializedGpuShadePipeline,
   ModeRenderState,

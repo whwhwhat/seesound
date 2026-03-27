@@ -74,10 +74,6 @@ import {
   spatialCache,
 } from "./render-resources";
 import {
-  GPU_FIELD_FRAGMENT_SHADER,
-  GPU_FIELD_VERTEX_SHADER,
-  GPU_SHADE_FRAGMENT_SHADER,
-  GPU_SHADE_VERTEX_SHADER,
   gpuFieldPipeline,
   gpuFieldValidation,
   gpuShadePipeline,
@@ -89,10 +85,6 @@ export {
   COLOR_FOCUS_HIGH_HZ,
   COLOR_FOCUS_LOW_HZ,
   FFT_SIZE,
-  GPU_FIELD_FRAGMENT_SHADER,
-  GPU_FIELD_VERTEX_SHADER,
-  GPU_SHADE_FRAGMENT_SHADER,
-  GPU_SHADE_VERTEX_SHADER,
   THEME_PRESETS,
   adaptiveColorMixWrap,
   angularRotationWrap,

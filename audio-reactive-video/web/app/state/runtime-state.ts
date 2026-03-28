@@ -96,6 +96,7 @@ const state: AppState = {
   midBandColor: [...THEME_PRESETS.lab.mid],
   highBandColor: [...THEME_PRESETS.lab.high],
   currentAudioObjectUrl: null,
+  currentAudioFileName: null,
   activeRenderer: "legacy",
   activePresentation: "cpu",
 };

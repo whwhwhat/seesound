@@ -133,6 +133,14 @@ output {
   margin-top: 14px;
 }
 
+.current-track {
+  margin: 10px 2px 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
 .control-grid {
   display: grid;
   grid-template-columns: 1fr;

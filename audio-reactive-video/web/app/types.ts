@@ -100,6 +100,7 @@ export interface AppState {
   midBandColor: RGBColor;
   highBandColor: RGBColor;
   currentAudioObjectUrl: string | null;
+  currentAudioFileName: string | null;
   activeRenderer: ActiveRenderer;
   activePresentation: ActivePresentation;
 }

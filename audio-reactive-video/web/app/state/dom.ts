@@ -38,6 +38,7 @@ const wgpuCanvas = requireElement<HTMLCanvasElement>("previewWgpu");
 const glCanvas = requireElement<HTMLCanvasElement>("previewGl");
 const audio = requireElement<HTMLAudioElement>("audio");
 const fileInput = requireElement<HTMLInputElement>("audioFile");
+const currentTrackNode = requireElement<HTMLParagraphElement>("currentTrack");
 const statusNode = requireElement<HTMLParagraphElement>("status");
 const plateShapeButtons = getSegmentedButtons("plateShape", "button[data-shape]");
 const angularRotationWrap = requireElement<HTMLElement>("angularRotationWrap");
@@ -115,6 +116,7 @@ export {
   combineModeWrap,
   contrastWrap,
   controls,
+  currentTrackNode,
   ctx,
   displayModeButtons,
   fileInput,

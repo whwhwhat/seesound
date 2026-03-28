@@ -4,6 +4,7 @@ import {
   canvas,
   combineModeSelect,
   controls,
+  currentTrackNode,
   displayModeButtons,
   fileInput,
   frameRateLimitButtons,
@@ -85,8 +86,10 @@ function bindEventHandlers() {
       URL.revokeObjectURL(state.currentAudioObjectUrl);
     }
     state.currentAudioObjectUrl = URL.createObjectURL(file);
+    state.currentAudioFileName = file.name;
     audio.src = state.currentAudioObjectUrl;
     audio.load();
+    currentTrackNode.textContent = `Current file: ${state.currentAudioFileName}`;
     statusNode.textContent = `Loaded ${file.name}. Press play to drive the field.`;
     requestRender();
   });

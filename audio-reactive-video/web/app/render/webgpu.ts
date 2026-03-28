@@ -1108,8 +1108,8 @@ function renderGlowContours(encoder: GPUCommandEncoder, targetView: GPUTextureVi
   const outerGlowColor = lerpColor(params.themePalette.outerColor, params.glowColor, clamp(0.72 + separation * 0.12, 0, 1));
   const innerGlowColor = lerpColor(params.themePalette.baseColor, params.glowColor, clamp(0.9 + separation * 0.08, 0, 1));
   const lineColor = lerpColor(params.themePalette.baseColor, params.glowColor, 1);
-  const outerCompositeOpacity = 0.48 * intensity;
-  const innerCompositeOpacity = 0.42 * intensity;
+  const outerCompositeOpacity = 0.60 * intensity;
+  const innerCompositeOpacity = 0.54 * intensity;
   const outerLineWidth = (10 + alpha * 8) * (0.9 + thickness * 0.42);
   const innerLineWidth = (4.4 + alpha * 2.4) * (0.92 + thickness * 0.32);
   const crispLineWidth = (2.4 + alpha * 1.6) * (0.8 + thickness * 0.34) * 0.92;

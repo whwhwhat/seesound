@@ -23,6 +23,9 @@ import PERCENTILE_HISTOGRAM_SHADER from "../shaders/wgsl/percentile-histogram.wg
 import PERCENTILE_MAX_SHADER from "../shaders/wgsl/percentile-max.wgsl?raw";
 import PERCENTILE_RESOLVE_SHADER from "../shaders/wgsl/percentile-resolve.wgsl?raw";
 import REDUCE_SHADER from "../shaders/wgsl/reduce.wgsl?raw";
+import RESIDUAL_ACCUMULATE_SHADER from "../shaders/wgsl/residual-accumulate.wgsl?raw";
+import RESIDUAL_APPLY_SHADER from "../shaders/wgsl/residual-apply.wgsl?raw";
+import RESIDUAL_RESOLVE_SHADER from "../shaders/wgsl/residual-resolve.wgsl?raw";
 import SEGMENT_RENDER_SHADER from "../shaders/wgsl/segment-render.wgsl?raw";
 import type {
   InitializedWebGpuState,
@@ -45,9 +48,11 @@ const MAX_CONTOUR_SEGMENTS = FIELD_STRIDE * FIELD_STRIDE * 2;
 const SEGMENT_STRIDE_BYTES = 32;
 const PERCENTILE_BIN_COUNT = 4096;
 const PERCENTILE_DEBUG_INTERVAL = 45;
+const RESIDUAL_BUCKET_COUNT = 268;
 const WEBGPU_FIELD_FORMAT = "rgba16float";
 const WEBGPU_ATLAS_FORMAT = "r32float";
 const WEBGPU_DITHER_FORMAT = "r32float";
+const WEBGPU_RESIDUAL_FORMAT = "r32float";
 const PRESENTATION_SUPERSAMPLE = 2;
 const PRESENTATION_MAX_SIZE = 2048;
 const percentileDebugFieldScratch = new Float32Array(fieldSize * fieldSize);
@@ -64,6 +69,9 @@ const webGpuState: WebGpuState = {
   uploadedAtlasKey: "",
   fieldPipeline: null,
   reducePipeline: null,
+  residualAccumulatePipeline: null,
+  residualResolvePipeline: null,
+  residualApplyPipeline: null,
   percentileMaxPipeline: null,
   percentileHistogramPipeline: null,
   percentileResolvePipeline: null,
@@ -77,6 +85,8 @@ const webGpuState: WebGpuState = {
   ditherTexture: null,
   fieldTexture: null,
   fieldView: null,
+  residualFieldTexture: null,
+  residualFieldView: null,
   colorAccumTexture: null,
   colorAccumView: null,
   colorWeightTexture: null,
@@ -85,6 +95,9 @@ const webGpuState: WebGpuState = {
   modeStateBuffer: null,
   fieldParamsBuffer: null,
   reduceParamsBuffer: null,
+  residualParamsBuffer: null,
+  residualStatsBuffer: null,
+  residualAverageBuffer: null,
   percentileParamsBuffer: null,
   percentileHistogramBuffer: null,
   percentileResultBuffer: null,
@@ -128,6 +141,9 @@ function requireInitializedWebGpuState(): InitializedWebGpuState {
     !webGpuState.context ||
     !webGpuState.fieldPipeline ||
     !webGpuState.reducePipeline ||
+    !webGpuState.residualAccumulatePipeline ||
+    !webGpuState.residualResolvePipeline ||
+    !webGpuState.residualApplyPipeline ||
     !webGpuState.percentileMaxPipeline ||
     !webGpuState.percentileHistogramPipeline ||
     !webGpuState.percentileResolvePipeline ||
@@ -141,6 +157,8 @@ function requireInitializedWebGpuState(): InitializedWebGpuState {
     !webGpuState.ditherTexture ||
     !webGpuState.fieldTexture ||
     !webGpuState.fieldView ||
+    !webGpuState.residualFieldTexture ||
+    !webGpuState.residualFieldView ||
     !webGpuState.colorAccumTexture ||
     !webGpuState.colorAccumView ||
     !webGpuState.colorWeightTexture ||
@@ -148,6 +166,9 @@ function requireInitializedWebGpuState(): InitializedWebGpuState {
     !webGpuState.modeStateBuffer ||
     !webGpuState.fieldParamsBuffer ||
     !webGpuState.reduceParamsBuffer ||
+    !webGpuState.residualParamsBuffer ||
+    !webGpuState.residualStatsBuffer ||
+    !webGpuState.residualAverageBuffer ||
     !webGpuState.percentileParamsBuffer ||
     !webGpuState.percentileHistogramBuffer ||
     !webGpuState.percentileResultBuffer ||
@@ -199,6 +220,13 @@ function createFieldTextures(): void {
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
   });
   webGpuState.fieldView = webGpuState.fieldTexture.createView();
+
+  webGpuState.residualFieldTexture = device.createTexture({
+    size: [fieldSize, fieldSize],
+    format: WEBGPU_RESIDUAL_FORMAT,
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+  });
+  webGpuState.residualFieldView = webGpuState.residualFieldTexture.createView();
 
   webGpuState.colorAccumTexture = device.createTexture({
     size: [fieldSize, fieldSize],
@@ -288,6 +316,18 @@ function createStaticTextures(): void {
     size: 16,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
+  webGpuState.residualParamsBuffer = device.createBuffer({
+    size: 16,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+  webGpuState.residualStatsBuffer = device.createBuffer({
+    size: RESIDUAL_BUCKET_COUNT * 4 * 2,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  });
+  webGpuState.residualAverageBuffer = device.createBuffer({
+    size: RESIDUAL_BUCKET_COUNT * 4,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  });
   webGpuState.percentileParamsBuffer = device.createBuffer({
     size: 16,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -342,6 +382,9 @@ function createPipelines(): void {
   const fullscreenVertexModule = createShaderModule(FULLSCREEN_VERTEX_SHADER);
   const fieldModule = createShaderModule(FIELD_SHADER);
   const reduceModule = createShaderModule(REDUCE_SHADER);
+  const residualAccumulateModule = createShaderModule(RESIDUAL_ACCUMULATE_SHADER);
+  const residualResolveModule = createShaderModule(RESIDUAL_RESOLVE_SHADER);
+  const residualApplyModule = createShaderModule(RESIDUAL_APPLY_SHADER);
   const percentileMaxModule = createShaderModule(PERCENTILE_MAX_SHADER);
   const percentileHistogramModule = createShaderModule(PERCENTILE_HISTOGRAM_SHADER);
   const percentileResolveModule = createShaderModule(PERCENTILE_RESOLVE_SHADER);
@@ -383,6 +426,30 @@ function createPipelines(): void {
     },
     primitive: {
       topology: "triangle-list",
+    },
+  });
+
+  webGpuState.residualAccumulatePipeline = device.createComputePipeline({
+    layout: "auto",
+    compute: {
+      module: residualAccumulateModule,
+      entryPoint: "main",
+    },
+  });
+
+  webGpuState.residualResolvePipeline = device.createComputePipeline({
+    layout: "auto",
+    compute: {
+      module: residualResolveModule,
+      entryPoint: "main",
+    },
+  });
+
+  webGpuState.residualApplyPipeline = device.createComputePipeline({
+    layout: "auto",
+    compute: {
+      module: residualApplyModule,
+      entryPoint: "main",
     },
   });
 
@@ -728,7 +795,7 @@ function encodeFieldPass(
 
 function encodeReductionPasses(encoder: GPUCommandEncoder): void {
   const readyState = requireInitializedWebGpuState();
-  let sourceView = readyState.fieldView;
+  let sourceView = getActiveFieldView();
   let sourceWidth = fieldSize;
   let sourceHeight = fieldSize;
 
@@ -774,6 +841,85 @@ function writePercentileParams(active: boolean): void {
   view.setUint32(8, state.plateShape === "circle" ? 1 : 0, true);
   view.setUint32(12, 0, true);
   requireWebGpuDevice().queue.writeBuffer(readyState.percentileParamsBuffer, 0, packed);
+}
+
+function shouldUseResidualField(): boolean {
+  return state.combineMode === "residual" && state.displayMode !== "single";
+}
+
+function getActiveFieldView(): GPUTextureView {
+  const readyState = requireInitializedWebGpuState();
+  if (shouldUseResidualField()) {
+    return readyState.residualFieldView;
+  }
+  return readyState.fieldView;
+}
+
+function encodeResidualPasses(encoder: GPUCommandEncoder): void {
+  const readyState = requireInitializedWebGpuState();
+  requireWebGpuDevice().queue.writeBuffer(
+    readyState.residualParamsBuffer,
+    0,
+    new Uint32Array([
+      state.plateShape === "circle" ? 1 : 0,
+      state.plateShape === "circle" ? RESIDUAL_BUCKET_COUNT : 1,
+      0,
+      0,
+    ]),
+  );
+  requireWebGpuDevice().queue.writeBuffer(
+    readyState.residualStatsBuffer,
+    0,
+    new Uint32Array(RESIDUAL_BUCKET_COUNT * 2),
+  );
+  requireWebGpuDevice().queue.writeBuffer(
+    readyState.residualAverageBuffer,
+    0,
+    new Float32Array(RESIDUAL_BUCKET_COUNT),
+  );
+
+  const accumulateBindGroup = requireWebGpuDevice().createBindGroup({
+    layout: readyState.residualAccumulatePipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: readyState.fieldView },
+      { binding: 1, resource: { buffer: readyState.residualParamsBuffer } },
+      { binding: 2, resource: { buffer: readyState.residualStatsBuffer } },
+    ],
+  });
+  const accumulatePass = encoder.beginComputePass();
+  accumulatePass.setPipeline(readyState.residualAccumulatePipeline);
+  accumulatePass.setBindGroup(0, accumulateBindGroup);
+  accumulatePass.dispatchWorkgroups(Math.ceil(fieldSize / 8), Math.ceil(fieldSize / 8), 1);
+  accumulatePass.end();
+
+  const resolveBindGroup = requireWebGpuDevice().createBindGroup({
+    layout: readyState.residualResolvePipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: readyState.residualParamsBuffer } },
+      { binding: 1, resource: { buffer: readyState.residualStatsBuffer } },
+      { binding: 2, resource: { buffer: readyState.residualAverageBuffer } },
+    ],
+  });
+  const resolvePass = encoder.beginComputePass();
+  resolvePass.setPipeline(readyState.residualResolvePipeline);
+  resolvePass.setBindGroup(0, resolveBindGroup);
+  resolvePass.dispatchWorkgroups(Math.ceil(RESIDUAL_BUCKET_COUNT / 64), 1, 1);
+  resolvePass.end();
+
+  const applyBindGroup = requireWebGpuDevice().createBindGroup({
+    layout: readyState.residualApplyPipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: readyState.fieldView },
+      { binding: 1, resource: { buffer: readyState.residualParamsBuffer } },
+      { binding: 2, resource: { buffer: readyState.residualAverageBuffer } },
+      { binding: 3, resource: readyState.residualFieldView },
+    ],
+  });
+  const applyPass = encoder.beginComputePass();
+  applyPass.setPipeline(readyState.residualApplyPipeline);
+  applyPass.setBindGroup(0, applyBindGroup);
+  applyPass.dispatchWorkgroups(Math.ceil(fieldSize / 8), Math.ceil(fieldSize / 8), 1);
+  applyPass.end();
 }
 
 function computeCpuPercentileMetrics(
@@ -927,7 +1073,7 @@ function encodeContourPass(encoder: GPUCommandEncoder): void {
   const bindGroup = requireWebGpuDevice().createBindGroup({
     layout: readyState.contourPipeline.getBindGroupLayout(0),
     entries: [
-      { binding: 0, resource: readyState.fieldView },
+      { binding: 0, resource: getActiveFieldView() },
       { binding: 1, resource: { buffer: readyState.segmentBuffer } },
       { binding: 2, resource: { buffer: readyState.contourParamsBuffer } },
       { binding: 3, resource: { buffer: readyState.percentileResultBuffer } },
@@ -942,7 +1088,7 @@ function encodeContourPass(encoder: GPUCommandEncoder): void {
 
 function encodeBackgroundPass(encoder: GPUCommandEncoder, targetView: GPUTextureView, params: WebGpuRenderParams): void {
   const readyState = requireInitializedWebGpuState();
-  const reductionView = webGpuState.reductionChain[webGpuState.reductionChain.length - 1]?.view ?? readyState.fieldView;
+  const reductionView = webGpuState.reductionChain[webGpuState.reductionChain.length - 1]?.view ?? getActiveFieldView();
   const backgroundParams = new Float32Array([
     wgpuCanvas.width, wgpuCanvas.height, params.centroid, params.rms,
     params.haloSharpness, params.backgroundWeight, params.contrast, params.singleAmpGate,
@@ -959,7 +1105,7 @@ function encodeBackgroundPass(encoder: GPUCommandEncoder, targetView: GPUTexture
   const bindGroup = requireWebGpuDevice().createBindGroup({
     layout: readyState.backgroundPipeline.getBindGroupLayout(0),
     entries: [
-      { binding: 0, resource: readyState.fieldView },
+      { binding: 0, resource: getActiveFieldView() },
       { binding: 1, resource: readyState.colorAccumView },
       { binding: 2, resource: readyState.colorWeightView },
       { binding: 3, resource: reductionView },
@@ -1223,6 +1369,10 @@ function renderSignedFieldWithWebGpu(
     let profileStart = frameProfileTools.profileSectionStart(frameProfileTools.frameProfile);
     encodeFieldPass(encoder, spatialAtlas, modeRenderState, params.isSingleMode, params.useGlowColor);
     frameProfileTools.profileSectionEnd(frameProfileTools.frameProfile, "webgpuField", profileStart);
+
+    if (shouldUseResidualField()) {
+      encodeResidualPasses(encoder);
+    }
 
     profileStart = frameProfileTools.profileSectionStart(frameProfileTools.frameProfile);
     encodeReductionPasses(encoder);

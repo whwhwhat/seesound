@@ -77,6 +77,7 @@ declare global {
   const GPUTextureUsage: {
     RENDER_ATTACHMENT: number;
     TEXTURE_BINDING: number;
+    STORAGE_BINDING: number;
     COPY_DST: number;
     COPY_SRC: number;
   };

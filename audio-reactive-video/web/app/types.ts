@@ -404,6 +404,9 @@ export interface WebGpuState {
   uploadedAtlasKey: string;
   fieldPipeline: GPURenderPipeline | null;
   reducePipeline: GPURenderPipeline | null;
+  residualAccumulatePipeline: GPUComputePipeline | null;
+  residualResolvePipeline: GPUComputePipeline | null;
+  residualApplyPipeline: GPUComputePipeline | null;
   percentileMaxPipeline: GPUComputePipeline | null;
   percentileHistogramPipeline: GPUComputePipeline | null;
   percentileResolvePipeline: GPUComputePipeline | null;
@@ -417,6 +420,8 @@ export interface WebGpuState {
   ditherTexture: GPUTexture | null;
   fieldTexture: GPUTexture | null;
   fieldView: GPUTextureView | null;
+  residualFieldTexture: GPUTexture | null;
+  residualFieldView: GPUTextureView | null;
   colorAccumTexture: GPUTexture | null;
   colorAccumView: GPUTextureView | null;
   colorWeightTexture: GPUTexture | null;
@@ -425,6 +430,9 @@ export interface WebGpuState {
   modeStateBuffer: GPUBuffer | null;
   fieldParamsBuffer: GPUBuffer | null;
   reduceParamsBuffer: GPUBuffer | null;
+  residualParamsBuffer: GPUBuffer | null;
+  residualStatsBuffer: GPUBuffer | null;
+  residualAverageBuffer: GPUBuffer | null;
   percentileParamsBuffer: GPUBuffer | null;
   percentileHistogramBuffer: GPUBuffer | null;
   percentileResultBuffer: GPUBuffer | null;
@@ -453,6 +461,9 @@ export interface InitializedWebGpuState extends WebGpuState {
   context: GPUCanvasContext;
   fieldPipeline: GPURenderPipeline;
   reducePipeline: GPURenderPipeline;
+  residualAccumulatePipeline: GPUComputePipeline;
+  residualResolvePipeline: GPUComputePipeline;
+  residualApplyPipeline: GPUComputePipeline;
   percentileMaxPipeline: GPUComputePipeline;
   percentileHistogramPipeline: GPUComputePipeline;
   percentileResolvePipeline: GPUComputePipeline;
@@ -466,6 +477,8 @@ export interface InitializedWebGpuState extends WebGpuState {
   ditherTexture: GPUTexture;
   fieldTexture: GPUTexture;
   fieldView: GPUTextureView;
+  residualFieldTexture: GPUTexture;
+  residualFieldView: GPUTextureView;
   colorAccumTexture: GPUTexture;
   colorAccumView: GPUTextureView;
   colorWeightTexture: GPUTexture;
@@ -473,6 +486,9 @@ export interface InitializedWebGpuState extends WebGpuState {
   modeStateBuffer: GPUBuffer;
   fieldParamsBuffer: GPUBuffer;
   reduceParamsBuffer: GPUBuffer;
+  residualParamsBuffer: GPUBuffer;
+  residualStatsBuffer: GPUBuffer;
+  residualAverageBuffer: GPUBuffer;
   percentileParamsBuffer: GPUBuffer;
   percentileHistogramBuffer: GPUBuffer;
   percentileResultBuffer: GPUBuffer;

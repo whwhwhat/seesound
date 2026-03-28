@@ -1171,8 +1171,8 @@ function renderIsolineContours(encoder: GPUCommandEncoder, targetView: GPUTextur
   const thresholdAlpha = Math.max(0.12, params.singleAmpGate);
   const lineColor = params.themePalette.lineColor;
   const offscreenMetrics = buildTargetMetrics(webGpuState.glowTargetWidth, webGpuState.glowTargetHeight);
-  const lineWidth = 1.05 + thresholdAlpha * 0.72;
-  const lineOpacity = 0.34 + thresholdAlpha * 0.46;
+  const lineWidth = 1.28 + thresholdAlpha * 0.98;
+  const lineOpacity = 0.40 + thresholdAlpha * 0.52;
 
   encodeLinePass(
     encoder,

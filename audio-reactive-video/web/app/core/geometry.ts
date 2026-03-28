@@ -16,6 +16,7 @@ import {
   fieldStride,
   renderBuffers,
   spatialAtlasCache,
+  spatialAtlasStore,
   spatialCache,
 } from "../state/render-resources";
 import {
@@ -228,22 +229,38 @@ function ensureSpatialAtlas() {
     return spatialAtlasCache;
   }
 
+  const cachedAtlas = spatialAtlasStore.get(key);
+  if (cachedAtlas) {
+    spatialAtlasCache.key = cachedAtlas.key;
+    spatialAtlasCache.sharp = cachedAtlas.sharp;
+    spatialAtlasCache.blurred = cachedAtlas.blurred;
+    spatialAtlasCache.modeCount = cachedAtlas.modeCount;
+    return spatialAtlasCache;
+  }
+
   const modeCount = state.modeState.length;
   const atlasLength = fieldCellCount * modeCount;
-  if (spatialAtlasCache.sharp.length !== atlasLength) {
-    spatialAtlasCache.sharp = new Float32Array(atlasLength);
-    spatialAtlasCache.blurred = new Float32Array(atlasLength);
-  }
+  const sharp = new Float32Array(atlasLength);
+  const blurred = new Float32Array(atlasLength);
 
   for (let index = 0; index < modeCount; index += 1) {
     const mode = state.modeState[index];
     const spatial = getSpatialMode(mode.m, mode.n);
-    spatialAtlasCache.sharp.set(spatial.sharp, index * fieldCellCount);
-    spatialAtlasCache.blurred.set(spatial.blurred, index * fieldCellCount);
+    sharp.set(spatial.sharp, index * fieldCellCount);
+    blurred.set(spatial.blurred, index * fieldCellCount);
   }
 
-  spatialAtlasCache.key = key;
-  spatialAtlasCache.modeCount = modeCount;
+  const atlas = {
+    key,
+    sharp,
+    blurred,
+    modeCount,
+  };
+  spatialAtlasStore.set(key, atlas);
+  spatialAtlasCache.key = atlas.key;
+  spatialAtlasCache.sharp = atlas.sharp;
+  spatialAtlasCache.blurred = atlas.blurred;
+  spatialAtlasCache.modeCount = atlas.modeCount;
   return spatialAtlasCache;
 }
 
@@ -287,8 +304,34 @@ function removeRadialAverage(field: Float32Array): void {
   }
 }
 
-function clearSpatialCache(): void {
-  spatialCache.clear();
+function clearSpatialCache(scope: "all" | "circle" | "square" = "all"): void {
+  if (scope === "all") {
+    spatialCache.clear();
+    spatialAtlasStore.clear();
+    spatialAtlasCache.key = "";
+    spatialAtlasCache.sharp = new Float32Array();
+    spatialAtlasCache.blurred = new Float32Array();
+    spatialAtlasCache.modeCount = 0;
+    return;
+  }
+
+  const prefix = `${scope}:`;
+  for (const key of spatialCache.keys()) {
+    if (key.startsWith(prefix)) {
+      spatialCache.delete(key);
+    }
+  }
+  for (const key of spatialAtlasStore.keys()) {
+    if (key.startsWith(prefix)) {
+      spatialAtlasStore.delete(key);
+    }
+  }
+  if (spatialAtlasCache.key.startsWith(prefix)) {
+    spatialAtlasCache.key = "";
+    spatialAtlasCache.sharp = new Float32Array();
+    spatialAtlasCache.blurred = new Float32Array();
+    spatialAtlasCache.modeCount = 0;
+  }
 }
 
 export {

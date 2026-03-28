@@ -71,6 +71,7 @@ const spatialAtlasCache: SpatialAtlasCache = {
   blurred: new Float32Array(),
   modeCount: 0,
 };
+const spatialAtlasStore = new Map<string, SpatialAtlasCache>();
 const spatialCache = new Map<string, SpatialModeBundle>();
 
 export {
@@ -89,5 +90,6 @@ export {
   glowCtx,
   renderBuffers,
   spatialAtlasCache,
+  spatialAtlasStore,
   spatialCache,
 };

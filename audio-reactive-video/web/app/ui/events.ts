@@ -94,7 +94,6 @@ function bindEventHandlers() {
   plateShapeButtons.forEach((button) => {
     button.addEventListener("click", () => {
       state.plateShape = button.dataset.shape === "circle" ? "circle" : "square";
-      clearSpatialCache();
       state.modeState = buildModes(Math.round(numericControls.modeCount));
       state.bandProfile = new Float32Array(state.modeState.length);
       updateModeLabel();
@@ -147,7 +146,7 @@ function bindEventHandlers() {
 
   controls.angularRotation.addEventListener("input", () => {
     if (state.plateShape === "circle") {
-      clearSpatialCache();
+      clearSpatialCache("circle");
     }
     requestRender();
   });

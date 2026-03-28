@@ -60,7 +60,7 @@ fn vsMain(
   let normal = vec2f(-direction.y, direction.x);
   let blurRadius = params.style.y;
   let halfSpan = params.style.x * 0.5 + blurRadius * 2.5 + 2.0;
-  let alongExtend = blurRadius * 2.5 + 2.0;
+  let alongExtend = halfSpan;
   let corners = array<vec2f, 6>(
     vec2f(-1.0, -1.0),
     vec2f(-1.0, 1.0),

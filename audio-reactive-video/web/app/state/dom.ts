@@ -32,12 +32,23 @@ function getSegmentedButtons(id: string, selector: string): HTMLButtonElement[] 
   return Array.from(requireElement<HTMLElement>(id).querySelectorAll<HTMLButtonElement>(selector));
 }
 
+const appShell = requireElement<HTMLElement>("appShell");
+const controlPanelViewport = requireElement<HTMLElement>("controlPanelViewport");
+const controlPanel = requireElement<HTMLElement>("controlPanel");
 const canvas = requireElement<HTMLCanvasElement>("preview");
 const ctx = requireCanvasContext(canvas);
 const wgpuCanvas = requireElement<HTMLCanvasElement>("previewWgpu");
 const glCanvas = requireElement<HTMLCanvasElement>("previewGl");
 const audio = requireElement<HTMLAudioElement>("audio");
+const audioPlayPauseButton = requireElement<HTMLButtonElement>("audioPlayPause");
+const audioSeekInput = requireElement<HTMLInputElement>("audioSeek");
+const audioTimeNode = requireElement<HTMLElement>("audioTime");
+const audioVolumeWrap = requireElement<HTMLElement>("audioVolumeWrap");
+const audioVolumeToggleButton = requireElement<HTMLButtonElement>("audioVolumeToggle");
+const audioVolumeInput = requireElement<HTMLInputElement>("audioVolume");
 const fileInput = requireElement<HTMLInputElement>("audioFile");
+const panelCollapseHandle = requireElement<HTMLButtonElement>("panelCollapseHandle");
+const panelExpandHandle = requireElement<HTMLButtonElement>("panelExpandHandle");
 const currentTrackNode = requireElement<HTMLParagraphElement>("currentTrack");
 const statusNode = requireElement<HTMLParagraphElement>("status");
 const plateShapeButtons = getSegmentedButtons("plateShape", "button[data-shape]");
@@ -52,15 +63,35 @@ const glowIntensityWrap = requireElement<HTMLElement>("glowIntensityWrap");
 const colorSeparationWrap = requireElement<HTMLElement>("colorSeparationWrap");
 const adaptiveColorMixWrap = requireElement<HTMLElement>("adaptiveColorMixWrap");
 const themeWrap = requireElement<HTMLElement>("themeWrap");
+const themeTrigger = requireElement<HTMLButtonElement>("themeTrigger");
+const themeMenu = requireElement<HTMLElement>("themeMenu");
+const themeValue = requireElement<HTMLElement>("themeValue");
 const lowColorWrap = requireElement<HTMLElement>("lowColorWrap");
 const midColorWrap = requireElement<HTMLElement>("midColorWrap");
 const highColorWrap = requireElement<HTMLElement>("highColorWrap");
+const lowColorButton = requireElement<HTMLButtonElement>("lowColorButton");
+const midColorButton = requireElement<HTMLButtonElement>("midColorButton");
+const highColorButton = requireElement<HTMLButtonElement>("highColorButton");
+const colorPickerPopover = requireElement<HTMLElement>("colorPickerPopover");
+const colorPickerSurface = requireElement<HTMLElement>("colorPickerSurface");
+const colorPickerHandle = requireElement<HTMLElement>("colorPickerHandle");
+const colorPickerHue = requireElement<HTMLInputElement>("colorPickerHue");
+const colorPickerHueHandle = requireElement<HTMLElement>("colorPickerHueHandle");
+const colorPickerHex = requireElement<HTMLInputElement>("colorPickerHex");
+const colorPickerR = requireElement<HTMLInputElement>("colorPickerR");
+const colorPickerG = requireElement<HTMLInputElement>("colorPickerG");
+const colorPickerB = requireElement<HTMLInputElement>("colorPickerB");
+const colorPickerPreview = requireElement<HTMLElement>("colorPickerPreview");
+const colorPickerValue = requireElement<HTMLElement>("colorPickerValue");
 const themeSelect = requireElement<HTMLSelectElement>("themeSelect");
 const lowColorInput = requireElement<HTMLInputElement>("lowColor");
 const midColorInput = requireElement<HTMLInputElement>("midColor");
 const highColorInput = requireElement<HTMLInputElement>("highColor");
 const displayModeButtons = getSegmentedButtons("displayMode", "button[data-mode]");
 const combineModeWrap = requireElement<HTMLElement>("combineModeWrap");
+const combineModeTrigger = requireElement<HTMLButtonElement>("combineModeTrigger");
+const combineModeMenu = requireElement<HTMLElement>("combineModeMenu");
+const combineModeValue = requireElement<HTMLElement>("combineModeValue");
 const combineModeSelect = requireElement<HTMLSelectElement>("combineMode");
 const singleModeWrap = requireElement<HTMLElement>("singleModeWrap");
 const modeLabel = requireElement<HTMLParagraphElement>("modeLabel");
@@ -105,16 +136,36 @@ const controls = Object.fromEntries(
 
 export {
   adaptiveColorMixWrap,
+  appShell,
   angularRotationWrap,
   atmosphereEnabledInput,
   atmosphereWrap,
   audio,
+  audioPlayPauseButton,
+  audioSeekInput,
+  audioTimeNode,
+  audioVolumeInput,
+  audioVolumeToggleButton,
+  audioVolumeWrap,
   bandLabel,
   canvas,
+  colorPickerB,
+  colorPickerG,
+  colorPickerHandle,
+  colorPickerHex,
+  colorPickerHue,
+  colorPickerHueHandle,
+  colorPickerPopover,
+  colorPickerPreview,
+  colorPickerR,
+  colorPickerSurface,
+  colorPickerValue,
   colorSeparationWrap,
   combineModeSelect,
   combineModeWrap,
   contrastWrap,
+  controlPanel,
+  controlPanelViewport,
   controls,
   currentTrackNode,
   ctx,
@@ -125,15 +176,20 @@ export {
   glowIntensityWrap,
   glowSpreadWrap,
   glowThicknessWrap,
+  highColorButton,
   highColorInput,
   highColorWrap,
+  lowColorButton,
   lowColorInput,
   lowColorWrap,
+  midColorButton,
   midColorInput,
   midColorWrap,
   modeLabel,
   nodalFocusWrap,
   numericControls,
+  panelCollapseHandle,
+  panelExpandHandle,
   plateShapeButtons,
   renderStyleButtons,
   singleModeIndexOutput,
@@ -141,7 +197,13 @@ export {
   singleModeViewWrap,
   singleModeWrap,
   statusNode,
+  combineModeMenu,
   themeSelect,
+  combineModeTrigger,
+  combineModeValue,
+  themeMenu,
+  themeTrigger,
+  themeValue,
   themeWrap,
   wgpuCanvas,
 };

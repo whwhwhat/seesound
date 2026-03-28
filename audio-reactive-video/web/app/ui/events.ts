@@ -1,22 +1,29 @@
 import {
-  audio,
+  appShell,
   atmosphereEnabledInput,
   canvas,
+  combineModeMenu,
   combineModeSelect,
+  combineModeTrigger,
+  combineModeValue,
+  controlPanelViewport,
   controls,
-  currentTrackNode,
   displayModeButtons,
-  fileInput,
   frameRateLimitButtons,
   highColorInput,
   lowColorInput,
   midColorInput,
   numericControls,
+  panelCollapseHandle,
+  panelExpandHandle,
   plateShapeButtons,
   renderStyleButtons,
   singleModeViewButtons,
   statusNode,
+  themeMenu,
   themeSelect,
+  themeTrigger,
+  themeValue,
   glCanvas,
   wgpuCanvas,
 } from "../state/dom";
@@ -29,7 +36,6 @@ import {
 import {
   applyTheme,
   buildModes,
-  ensureAudioGraph,
   setProfilerEnabled,
   syncControlVisibility,
   syncThemeInputs,
@@ -47,12 +53,7 @@ import {
 } from "../render/webgpu";
 import {
   requestRender,
-  startAnimationLoop,
-  stopAnimationLoop,
 } from "../render/renderer";
-import {
-  hexToRgb,
-} from "../core/utils";
 import type {
   CombineMode,
   ThemeKey,
@@ -76,22 +77,94 @@ function bindEventHandlers() {
     requestRender();
   });
 
-  fileInput.addEventListener("change", () => {
-    const [file] = fileInput.files || [];
-    if (!file) {
+  const updateSelectLabel = (valueNode: HTMLElement, select: HTMLSelectElement) => {
+    valueNode.textContent = select.selectedOptions[0]?.textContent ?? "";
+  };
+
+  const closeSelectMenu = (trigger: HTMLButtonElement, menu: HTMLElement) => {
+    trigger.setAttribute("aria-expanded", "false");
+    menu.hidden = true;
+  };
+
+  const openSelectMenu = (trigger: HTMLButtonElement, menu: HTMLElement) => {
+    trigger.setAttribute("aria-expanded", "true");
+    menu.hidden = false;
+  };
+
+  const toggleSelectMenu = (trigger: HTMLButtonElement, menu: HTMLElement) => {
+    if (menu.hidden) {
+      openSelectMenu(trigger, menu);
       return;
     }
-    ensureAudioGraph();
-    if (state.currentAudioObjectUrl) {
-      URL.revokeObjectURL(state.currentAudioObjectUrl);
-    }
-    state.currentAudioObjectUrl = URL.createObjectURL(file);
-    state.currentAudioFileName = file.name;
-    audio.src = state.currentAudioObjectUrl;
-    audio.load();
-    currentTrackNode.textContent = `Current file: ${state.currentAudioFileName}`;
-    statusNode.textContent = `Loaded ${file.name}. Press play to drive the field.`;
+    closeSelectMenu(trigger, menu);
+  };
+
+  const closeAllMenus = () => {
+    closeSelectMenu(themeTrigger, themeMenu);
+    closeSelectMenu(combineModeTrigger, combineModeMenu);
+  };
+
+  updateSelectLabel(themeValue, themeSelect);
+  updateSelectLabel(combineModeValue, combineModeSelect);
+
+  themeTrigger.addEventListener("click", (event) => {
+    event.stopPropagation();
+    closeSelectMenu(combineModeTrigger, combineModeMenu);
+    toggleSelectMenu(themeTrigger, themeMenu);
+  });
+
+  combineModeTrigger.addEventListener("click", (event) => {
+    event.stopPropagation();
+    closeSelectMenu(themeTrigger, themeMenu);
+    toggleSelectMenu(combineModeTrigger, combineModeMenu);
+  });
+
+  document.querySelectorAll<HTMLButtonElement>(".select-option").forEach((option) => {
+    option.addEventListener("click", () => {
+      const target = option.dataset.select;
+      const value = option.dataset.value;
+      if (!value) {
+        return;
+      }
+      if (target === "theme") {
+        themeSelect.value = value;
+        updateSelectLabel(themeValue, themeSelect);
+        closeSelectMenu(themeTrigger, themeMenu);
+        themeSelect.dispatchEvent(new Event("input", { bubbles: true }));
+        return;
+      }
+      combineModeSelect.value = value;
+      updateSelectLabel(combineModeValue, combineModeSelect);
+      closeSelectMenu(combineModeTrigger, combineModeMenu);
+      combineModeSelect.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  });
+
+  document.addEventListener("click", () => {
+    closeAllMenus();
+  });
+
+  const syncPanelToggleState = (collapsed: boolean) => {
+    panelCollapseHandle.setAttribute("aria-expanded", String(!collapsed));
+    panelCollapseHandle.setAttribute("aria-label", collapsed ? "Expand control panel" : "Collapse control panel");
+    panelExpandHandle.setAttribute("aria-expanded", String(!collapsed));
+    panelExpandHandle.setAttribute("aria-label", collapsed ? "Expand control panel" : "Collapse control panel");
+  };
+
+  const setPanelCollapsed = (collapsed: boolean) => {
+    appShell.classList.toggle("is-collapsed", collapsed);
+    controlPanelViewport.classList.toggle("is-collapsed", collapsed);
+    syncPanelToggleState(collapsed);
     requestRender();
+  };
+
+  controlPanelViewport.classList.toggle("is-collapsed", appShell.classList.contains("is-collapsed"));
+  syncPanelToggleState(appShell.classList.contains("is-collapsed"));
+  panelCollapseHandle.addEventListener("click", () => {
+    setPanelCollapsed(true);
+  });
+  panelExpandHandle.addEventListener("click", () => {
+    setPanelCollapsed(false);
   });
 
   plateShapeButtons.forEach((button) => {
@@ -202,42 +275,18 @@ function bindEventHandlers() {
     if (themeSelect.value === "custom") {
       state.activeTheme = "custom";
       syncThemeInputs();
+      lowColorInput.dispatchEvent(new Event("input", { bubbles: true }));
+      midColorInput.dispatchEvent(new Event("input", { bubbles: true }));
+      highColorInput.dispatchEvent(new Event("input", { bubbles: true }));
+      updateSelectLabel(themeValue, themeSelect);
       requestRender();
       return;
     }
     applyTheme(themeSelect.value as ThemeKey);
-    requestRender();
-  });
-
-  [lowColorInput, midColorInput, highColorInput].forEach((input) => {
-    input.addEventListener("input", () => {
-      state.lowBandColor = hexToRgb(lowColorInput.value);
-      state.midBandColor = hexToRgb(midColorInput.value);
-      state.highBandColor = hexToRgb(highColorInput.value);
-      state.activeTheme = "custom";
-      themeSelect.value = "custom";
-      requestRender();
-    });
-  });
-
-  audio.addEventListener("play", async () => {
-    ensureAudioGraph();
-    if (state.audioContext) {
-      await state.audioContext.resume();
-    }
-    statusNode.textContent = "Running realtime resonance preview.";
-    startAnimationLoop();
-  });
-
-  audio.addEventListener("pause", () => {
-    statusNode.textContent = "Playback paused. Field is frozen at the current state.";
-    stopAnimationLoop();
-    requestRender();
-  });
-
-  audio.addEventListener("ended", () => {
-    statusNode.textContent = "Playback ended. Field is frozen at the final state.";
-    stopAnimationLoop();
+    lowColorInput.dispatchEvent(new Event("input", { bubbles: true }));
+    midColorInput.dispatchEvent(new Event("input", { bubbles: true }));
+    highColorInput.dispatchEvent(new Event("input", { bubbles: true }));
+    updateSelectLabel(themeValue, themeSelect);
     requestRender();
   });
 

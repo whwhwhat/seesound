@@ -10,6 +10,12 @@ import {
   updateModeLabel,
 } from "./core/runtime";
 import {
+  bindAudioPlayer,
+} from "./ui/audio-player";
+import {
+  bindColorPicker,
+} from "./ui/color-picker";
+import {
   bindEventHandlers,
 } from "./ui/events";
 import {
@@ -28,6 +34,8 @@ state.modeState = buildModes(Math.round(numericControls.modeCount));
 controls.singleModeIndex.max = String(Math.round(numericControls.modeCount));
 updateModeLabel();
 syncControlVisibility();
+bindAudioPlayer();
+bindColorPicker();
 bindEventHandlers();
 window.dispatchEvent(new Event("resize"));
 primeWebGpuRenderer().then((ready) => {

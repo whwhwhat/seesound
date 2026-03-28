@@ -301,10 +301,10 @@ function syncControlVisibility() {
   glowIntensityWrap.classList.toggle("is-hidden", !isGlow);
   colorSeparationWrap.classList.add("is-hidden");
   adaptiveColorMixWrap.classList.add("is-hidden");
-  themeWrap.classList.toggle("is-hidden", !isGlow);
-  lowColorWrap.classList.toggle("is-hidden", !isGlow);
-  midColorWrap.classList.toggle("is-hidden", !isGlow);
-  highColorWrap.classList.toggle("is-hidden", !isGlow);
+  themeWrap.classList.toggle("is-hidden", false);
+  lowColorWrap.classList.toggle("is-hidden", false);
+  midColorWrap.classList.toggle("is-hidden", false);
+  highColorWrap.classList.toggle("is-hidden", false);
   nodalFocusWrap.classList.add("is-hidden");
   contrastWrap.classList.add("is-hidden");
   combineModeWrap.classList.toggle("is-hidden", isSingle);

@@ -7,213 +7,364 @@
     <link rel="stylesheet" href="./app.css" />
   </head>
   <body>
-    <main class="app-shell">
-      <section class="control-panel">
+    <main id="appShell" class="app-shell">
+      <section id="controlPanelViewport" class="control-panel-viewport">
+        <div id="controlPanel" class="control-panel">
         <div class="panel-header">
-          <p class="eyebrow">Audio Reactive Video</p>
-          <h1>Realtime Resonance Field</h1>
-          <p class="lede">
-            Browser-side preview for Chladni-inspired resonance experiments. Upload a track,
-            play it, and tune how strongly modal fields compete.
-          </p>
-        </div>
-
-        <div class="control-group">
-          <label class="file-picker">
-            <span>Load audio</span>
-            <input id="audioFile" type="file" accept="audio/*" />
-          </label>
-          <audio id="audio" controls preload="metadata"></audio>
-          <p id="currentTrack" class="current-track">Current file: none</p>
-        </div>
-
-        <div class="controls-section">
-          <p class="section-title">Display</p>
-          <div class="control-grid">
-            <label id="themeWrap">
-              <span>Theme</span>
-              <select id="themeSelect">
-                <option value="lab">Lab Green</option>
-                <option value="amber">Amber Mist</option>
-                <option value="ice">Ice Cyan</option>
-                <option value="heat">Heatmap</option>
-                <option value="mono">Monochrome</option>
-                <option value="custom">Custom</option>
-              </select>
-              <small class="control-help">Preset frequency palettes for glow mode.</small>
-            </label>
-            <label id="lowColorWrap">
-              <span>Low color</span>
-              <input id="lowColor" type="color" value="#6c7a2b" />
-              <small class="control-help">Low-frequency anchor color.</small>
-            </label>
-            <label id="midColorWrap">
-              <span>Mid color</span>
-              <input id="midColor" type="color" value="#bcde48" />
-              <small class="control-help">Mid-band anchor color.</small>
-            </label>
-            <label id="highColorWrap">
-              <span>High color</span>
-              <input id="highColor" type="color" value="#bcf4ff" />
-              <small class="control-help">High-frequency anchor color.</small>
-            </label>
-            <label>
-              <span>Plate shape</span>
-              <div class="segmented-control" id="plateShape">
-                <button type="button" data-shape="square" class="is-active">Square</button>
-                <button type="button" data-shape="circle">Circle</button>
-              </div>
-            </label>
-            <label id="angularRotationWrap" class="is-hidden">
-              <span>Angular rotation</span>
-              <input id="angularRotation" type="range" min="0.00" max="360.00" step="1.00" value="0.00" />
-              <output for="angularRotation">0.00</output>
-              <small class="control-help">Rotate circular angular nodes. Suggested: `0-90`.</small>
-            </label>
-          <label>
-            <span>Render style</span>
-            <div class="segmented-control" id="renderStyle">
-              <button type="button" data-render-style="glow" class="is-active">Glow</button>
-              <button type="button" data-render-style="isoline">Isoline</button>
-            </div>
-          </label>
-          <label>
-            <span>Frame rate</span>
-            <div class="segmented-control" id="frameRateLimit">
-              <button type="button" data-frame-rate="auto" class="is-active">Auto</button>
-              <button type="button" data-frame-rate="60">60 FPS</button>
-            </div>
-            <small class="control-help">Cap animation refresh to reduce CPU/GPU load.</small>
-          </label>
-          <label id="atmosphereWrap" class="control-toggle">
-            <span>Atmosphere background</span>
-            <input id="atmosphereEnabled" type="checkbox" checked />
-            <small class="control-help">Theme-aware center haze and soft backdrop.</small>
-          </label>
-          <label id="glowThicknessWrap">
-            <span>Glow thickness</span>
-            <input id="glowThickness" type="range" min="0.20" max="10.00" step="0.01" value="1.25" />
-            <output for="glowThickness">1.25</output>
-            <small class="control-help">Line body thickness. Suggested: `0.8-3.0`.</small>
-          </label>
-          <label id="glowSpreadWrap">
-            <span>Glow spread</span>
-            <input id="glowSpread" type="range" min="0.10" max="10.00" step="0.01" value="1.00" />
-            <output for="glowSpread">1.00</output>
-            <small class="control-help">Glow falloff radius. Suggested: `0.6-2.0`.</small>
-          </label>
-          <label id="glowIntensityWrap">
-            <span>Glow intensity</span>
-            <input id="glowIntensity" type="range" min="0.10" max="4.00" step="0.01" value="1.00" />
-            <output for="glowIntensity">1.00</output>
-            <small class="control-help">Glow brightness gain. Suggested: `0.8-2.0`.</small>
-          </label>
-          <label id="colorSeparationWrap" class="is-hidden">
-            <span>Color separation</span>
-            <input id="colorSeparation" type="range" min="0.00" max="4.00" step="0.01" value="1.00" />
-            <output for="colorSeparation">1.00</output>
-            <small class="control-help">Frequency color spread. Suggested: `0.8-1.8`.</small>
-          </label>
-          <label id="adaptiveColorMixWrap" class="is-hidden">
-            <span>Adaptive color mix</span>
-            <input id="adaptiveColorMix" type="range" min="0.00" max="1.00" step="0.01" value="0.35" />
-            <output for="adaptiveColorMix">0.35</output>
-            <small class="control-help">Blend fixed frequency tint with track-adaptive color spacing. Suggested: `0.2-0.6`.</small>
-          </label>
-          <label>
-            <span>Display mode</span>
-            <div class="segmented-control" id="displayMode">
-              <button type="button" data-mode="sum" class="is-active">Combined</button>
-                <button type="button" data-mode="single">Single mode</button>
-              </div>
-            </label>
-          <label id="combineModeWrap">
-            <span>Combine mode</span>
-            <select id="combineMode">
-              <option value="signed">Signed</option>
-              <option value="residual">Residual</option>
-              <option value="percentile">Percentile slice</option>
-            </select>
-            <small class="control-help">`Signed` keeps interference. The others are experimental envelope-derived views.</small>
-          </label>
-          <label id="singleModeWrap" class="is-hidden">
-            <span>Mode index</span>
-            <input id="singleModeIndex" type="range" min="1" max="12" step="1" value="1" />
-            <output for="singleModeIndex">1</output>
-            <small class="control-help">Inspect one modal pattern at a time.</small>
-          </label>
-          <p id="modeLabel" class="mode-label is-hidden">Mode pair: (m=1, n=2)</p>
-          <p id="bandLabel" class="mode-label is-hidden">Drive band: 47 - 94 Hz</p>
-          <label id="singleModeViewWrap" class="is-hidden">
-            <span>Single mode view</span>
-            <div class="segmented-control" id="singleModeView">
-              <button type="button" data-single-view="amplitude" class="is-active">Amplitude</button>
-              <button type="button" data-single-view="oscillation">Oscillation</button>
-            </div>
-            <small class="control-help">`Amplitude` keeps the pattern fixed. `Oscillation` adds signed phase motion.</small>
-          </label>
-          <label id="nodalFocusWrap" class="is-hidden">
-            <span>Nodal focus</span>
-            <input id="nodalFocus" type="range" min="0.10" max="8.00" step="0.01" value="1.35" />
-            <output for="nodalFocus">1.35</output>
-            <small class="control-help">Zero-line sharpness in glow mode. Suggested: `0.8-2.5`.</small>
-          </label>
-          <label id="contrastWrap" class="is-hidden">
-            <span>Field contrast</span>
-            <input id="contrast" type="range" min="0.20" max="6.00" step="0.01" value="1.30" />
-            <output for="contrast">1.30</output>
-            <small class="control-help">Background field falloff. Suggested: `0.8-2.0`.</small>
-          </label>
+          <div class="panel-header-copy">
+            <p class="brand-mark">SeeSound</p>
+            <h1>Shape sound into a living resonance field.</h1>
+            <p class="lede">
+              Inspired by Chladni figures and resonant plate patterns, this canvas turns audio
+              energy into shifting nodal geometry.
+            </p>
           </div>
         </div>
 
-        <div class="controls-section">
-          <p class="section-title">Synthesis</p>
-          <div class="control-grid">
-          <label>
-            <span>Mode count</span>
-            <input id="modeCount" type="range" min="2" max="48" step="1" value="24" />
-            <output for="modeCount">24</output>
-            <small class="control-help">Number of active modal slots. Suggested: `8-24`.</small>
-          </label>
-          <label>
-            <span>Coupling</span>
-            <input id="coupling" type="range" min="0.00" max="4.00" step="0.01" value="0.72" />
-            <output for="coupling">0.72</output>
-            <small class="control-help">Drive strength from audio into modal energy. Suggested: `0.4-1.4`.</small>
-          </label>
-          <label>
-            <span>Persistence</span>
-            <input id="persistence" type="range" min="0.00" max="0.999" step="0.001" value="0.280" />
-            <output for="persistence">0.28</output>
-            <small class="control-help">How long modal motion persists after excitation. Suggested: `0.75-0.95`.</small>
-          </label>
-          <label>
-            <span>Motion</span>
-            <input id="motion" type="range" min="0.00" max="4.00" step="0.01" value="0.48" />
-            <output for="motion">0.48</output>
-            <small class="control-help">Internal phase drift and detune activity. Suggested: `0.2-1.0`.</small>
-          </label>
+        <div class="control-panel-body">
+          <div class="control-group playback-group">
+            <div class="playback-header">
+              <p class="section-title">Playback</p>
+              <p class="session-kicker">Start with a track, then shape the field in real time.</p>
+            </div>
+            <div class="audio-player">
+              <div class="audio-player__row">
+                <button id="audioPlayPause" class="audio-player__play" type="button" aria-label="Play audio">
+                  <span class="audio-player__play-icon" aria-hidden="true"></span>
+                </button>
+                <div class="audio-player__timeline">
+                  <input id="audioSeek" class="audio-player__seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Seek audio" />
+                </div>
+                <p id="audioTime" class="audio-player__time">0:00 / 0:00</p>
+                <div id="audioVolumeWrap" class="audio-player__volume">
+                  <button id="audioVolumeToggle" class="audio-player__volume-button" type="button" aria-label="Show volume control" aria-expanded="false">
+                    <svg class="audio-player__icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M4 14h4l5 4V6L8 10H4z"></path>
+                      <path class="audio-player__volume-wave audio-player__volume-wave--low" d="M16 10.25a2.75 2.75 0 0 1 0 3.5"></path>
+                      <path class="audio-player__volume-wave audio-player__volume-wave--mid" d="M18 8.5a5 5 0 0 1 0 7"></path>
+                      <path class="audio-player__volume-wave audio-player__volume-wave--high" d="M20 6.75a7.25 7.25 0 0 1 0 10.5"></path>
+                      <path class="audio-player__volume-wave audio-player__volume-wave--mute" d="M16 9l5 6"></path>
+                      <path class="audio-player__volume-wave audio-player__volume-wave--mute" d="M21 9l-5 6"></path>
+                    </svg>
+                  </button>
+                  <div class="audio-player__volume-popover" hidden>
+                    <input id="audioVolume" class="audio-player__volume-slider" type="range" min="0" max="100" step="1" value="100" aria-label="Audio volume" />
+                  </div>
+                </div>
+                <label class="audio-player__load">
+                  <svg class="audio-player__icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3.5 7.5h6l2 2h9v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"></path>
+                    <path d="M3.5 7.5v-1a2 2 0 0 1 2-2h4l2 2h3"></path>
+                  </svg>
+                  <input id="audioFile" type="file" accept="audio/*" />
+                </label>
+              </div>
+              <audio id="audio" preload="metadata"></audio>
+            </div>
+            <div class="session-meta">
+              <p id="currentTrack" class="current-track">No track loaded</p>
+              <p id="status" class="status-pill">Load audio to start the analyser.</p>
+            </div>
+          </div>
+
+          <div class="controls-section">
+            <p class="section-title">Visual Style</p>
+            <div class="control-grid">
+              <div id="themeWrap" class="custom-select">
+                <span>Theme</span>
+                <div class="select-shell">
+                  <button id="themeTrigger" class="select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                    <span id="themeValue">Lab Green</span>
+                    <span class="select-chevron" aria-hidden="true"></span>
+                  </button>
+                  <div id="themeMenu" class="select-menu" role="listbox" hidden>
+                    <button type="button" class="select-option" data-select="theme" data-value="lab">Lab Green</button>
+                    <button type="button" class="select-option" data-select="theme" data-value="amber">Amber Mist</button>
+                    <button type="button" class="select-option" data-select="theme" data-value="ice">Ice Cyan</button>
+                    <button type="button" class="select-option" data-select="theme" data-value="heat">Heatmap</button>
+                    <button type="button" class="select-option" data-select="theme" data-value="mono">Monochrome</button>
+                    <button type="button" class="select-option" data-select="theme" data-value="custom">Custom</button>
+                  </div>
+                  <select id="themeSelect" class="native-control-hidden">
+                    <option value="lab">Lab Green</option>
+                    <option value="amber">Amber Mist</option>
+                    <option value="ice">Ice Cyan</option>
+                    <option value="heat">Heatmap</option>
+                    <option value="mono">Monochrome</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+                <small class="control-help">Choose the scene palette before refining the colors.</small>
+              </div>
+              <div class="color-row">
+                <div id="lowColorWrap" class="color-swatch-control">
+                  <span>Low</span>
+                  <button id="lowColorButton" class="color-swatch-button" type="button" aria-label="Choose low color">
+                    <span class="color-swatch-fill"></span>
+                  </button>
+                  <input id="lowColor" class="native-control-hidden native-color-input" type="color" value="#6c7a2b" />
+                  <small class="control-help">Bass region tint.</small>
+                </div>
+                <div id="midColorWrap" class="color-swatch-control">
+                  <span>Mid</span>
+                  <button id="midColorButton" class="color-swatch-button" type="button" aria-label="Choose mid color">
+                    <span class="color-swatch-fill"></span>
+                  </button>
+                  <input id="midColor" class="native-control-hidden native-color-input" type="color" value="#bcde48" />
+                  <small class="control-help">Middle band tint.</small>
+                </div>
+                <div id="highColorWrap" class="color-swatch-control">
+                  <span>High</span>
+                  <button id="highColorButton" class="color-swatch-button" type="button" aria-label="Choose high color">
+                    <span class="color-swatch-fill"></span>
+                  </button>
+                  <input id="highColor" class="native-control-hidden native-color-input" type="color" value="#bcf4ff" />
+                  <small class="control-help">Treble region tint.</small>
+                </div>
+              </div>
+              <div class="control-block">
+                <span>Plate shape</span>
+                <div class="segmented-control" id="plateShape">
+                  <button type="button" data-shape="square" class="is-active">Square</button>
+                  <button type="button" data-shape="circle">Circle</button>
+                </div>
+                <small class="control-help">Square feels architectural. Circle feels more orbital and fluid.</small>
+              </div>
+              <div class="control-block">
+                <span>Render style</span>
+                <div class="segmented-control" id="renderStyle">
+                  <button type="button" data-render-style="glow" class="is-active">Glow</button>
+                  <button type="button" data-render-style="isoline">Isoline</button>
+                </div>
+                <small class="control-help">Glow emphasizes atmosphere. Isoline reveals the nodal skeleton.</small>
+              </div>
+              <label id="atmosphereWrap" class="control-toggle">
+                <span>Atmosphere background</span>
+                <input id="atmosphereEnabled" type="checkbox" checked />
+                <small class="control-help">Adds a soft center haze and scene depth behind the field.</small>
+              </label>
+              <label id="glowIntensityWrap">
+                <span>Energy</span>
+                <input id="glowIntensity" type="range" min="0.10" max="4.00" step="0.01" value="1.00" />
+                <output for="glowIntensity">1.00</output>
+                <small class="control-help">Overall brightness and presence of the field.</small>
+              </label>
+              <label id="glowSpreadWrap">
+                <span>Softness</span>
+                <input id="glowSpread" type="range" min="0.10" max="10.00" step="0.01" value="1.00" />
+                <output for="glowSpread">1.00</output>
+                <small class="control-help">Controls how far the glow blooms into the background.</small>
+              </label>
+              <label id="glowThicknessWrap">
+                <span>Line weight</span>
+                <input id="glowThickness" type="range" min="0.20" max="10.00" step="0.01" value="1.25" />
+                <output for="glowThickness">1.25</output>
+                <small class="control-help">Thicker lines feel denser and more tactile.</small>
+              </label>
+            </div>
+          </div>
+
+          <div class="controls-section">
+            <p class="section-title">Field Behavior</p>
+            <div class="control-grid">
+              <label>
+                <span>Focus</span>
+                <div class="segmented-control" id="displayMode">
+                  <button type="button" data-mode="sum" class="is-active">Combined</button>
+                  <button type="button" data-mode="single">Single mode</button>
+                </div>
+                <small class="control-help">Browse the full interference field or isolate one resonant pattern.</small>
+              </label>
+              <div id="combineModeWrap" class="custom-select">
+                <span>Field blend</span>
+                <div class="select-shell">
+                  <button id="combineModeTrigger" class="select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                    <span id="combineModeValue">Signed</span>
+                    <span class="select-chevron" aria-hidden="true"></span>
+                  </button>
+                  <div id="combineModeMenu" class="select-menu" role="listbox" hidden>
+                    <button type="button" class="select-option" data-select="combine" data-value="signed">Signed</button>
+                    <button type="button" class="select-option" data-select="combine" data-value="residual">Residual</button>
+                    <button type="button" class="select-option" data-select="combine" data-value="percentile">Percentile slice</button>
+                  </div>
+                  <select id="combineMode" class="native-control-hidden">
+                    <option value="signed">Signed</option>
+                    <option value="residual">Residual</option>
+                    <option value="percentile">Percentile slice</option>
+                  </select>
+                </div>
+                <small class="control-help">Different blend modes reveal interference, envelopes, or thresholded structure.</small>
+              </div>
+              <label id="singleModeWrap" class="is-hidden">
+                <span>Mode index</span>
+                <input id="singleModeIndex" type="range" min="1" max="12" step="1" value="1" />
+                <output for="singleModeIndex">1</output>
+                <small class="control-help">Scrub through individual resonant shapes.</small>
+              </label>
+              <p id="modeLabel" class="mode-label is-hidden">Mode pair: (m=1, n=2)</p>
+              <p id="bandLabel" class="mode-label is-hidden">Drive band: 47 - 94 Hz</p>
+              <label id="singleModeViewWrap" class="is-hidden">
+                <span>Motion style</span>
+                <div class="segmented-control" id="singleModeView">
+                  <button type="button" data-single-view="amplitude" class="is-active">Amplitude</button>
+                  <button type="button" data-single-view="oscillation">Oscillation</button>
+                </div>
+                <small class="control-help">Keep the pattern steady or let it breathe with signed motion.</small>
+              </label>
+            </div>
+          </div>
+
+          <details class="advanced-panel">
+            <summary>Advanced tuning</summary>
+            <div class="controls-section controls-section--advanced">
+              <div class="control-grid">
+                <label id="angularRotationWrap" class="is-hidden">
+                  <span>Angular rotation</span>
+                  <input id="angularRotation" type="range" min="0.00" max="360.00" step="1.00" value="0.00" />
+                  <output for="angularRotation">0.00</output>
+                  <small class="control-help">Rotate circular angular nodes. Suggested: `0-90`.</small>
+                </label>
+                <label>
+                  <span>Resonators</span>
+                  <input id="modeCount" type="range" min="2" max="48" step="1" value="24" />
+                  <output for="modeCount">24</output>
+                  <small class="control-help">How many modal voices take part in the field.</small>
+                </label>
+                <label>
+                  <span>Audio drive</span>
+                  <input id="coupling" type="range" min="0.00" max="4.00" step="0.01" value="0.72" />
+                  <output for="coupling">0.72</output>
+                  <small class="control-help">How strongly the soundtrack excites the resonant system.</small>
+                </label>
+                <label>
+                  <span>Sustain</span>
+                  <input id="persistence" type="range" min="0.00" max="0.999" step="0.001" value="0.280" />
+                  <output for="persistence">0.28</output>
+                  <small class="control-help">Longer sustain keeps motion hanging in the field.</small>
+                </label>
+                <label>
+                  <span>Drift</span>
+                  <input id="motion" type="range" min="0.00" max="4.00" step="0.01" value="0.48" />
+                  <output for="motion">0.48</output>
+                  <small class="control-help">Adds internal phase movement and detune activity.</small>
+                </label>
+                <label id="nodalFocusWrap" class="is-hidden">
+                  <span>Edge focus</span>
+                  <input id="nodalFocus" type="range" min="0.10" max="8.00" step="0.01" value="1.35" />
+                  <output for="nodalFocus">1.35</output>
+                  <small class="control-help">Sharpens the nodal lines in glow mode.</small>
+                </label>
+                <label id="contrastWrap" class="is-hidden">
+                  <span>Contrast</span>
+                  <input id="contrast" type="range" min="0.20" max="6.00" step="0.01" value="1.30" />
+                  <output for="contrast">1.30</output>
+                  <small class="control-help">Controls falloff between the field core and the background.</small>
+                </label>
+                <label id="colorSeparationWrap" class="is-hidden">
+                  <span>Color separation</span>
+                  <input id="colorSeparation" type="range" min="0.00" max="4.00" step="0.01" value="1.00" />
+                  <output for="colorSeparation">1.00</output>
+                  <small class="control-help">Frequency color spread. Suggested: `0.8-1.8`.</small>
+                </label>
+                <label id="adaptiveColorMixWrap" class="is-hidden">
+                  <span>Adaptive color mix</span>
+                  <input id="adaptiveColorMix" type="range" min="0.00" max="1.00" step="0.01" value="0.35" />
+                  <output for="adaptiveColorMix">0.35</output>
+                  <small class="control-help">Blend fixed frequency tint with track-adaptive color spacing. Suggested: `0.2-0.6`.</small>
+                </label>
+                <label>
+                  <span>Frame rate</span>
+                  <div class="segmented-control" id="frameRateLimit">
+                    <button type="button" data-frame-rate="auto">Auto</button>
+                    <button type="button" data-frame-rate="60" class="is-active">60 FPS</button>
+                  </div>
+                  <small class="control-help">Cap refresh when you want a steadier thermal budget.</small>
+                </label>
+              </div>
+            </div>
+          </details>
+
+          <div class="notes">
+            <p>
+              This preview listens directly in the browser rather than using the offline
+              `analysis.json` pipeline, so the goal here is feel, speed, and visual iteration.
+            </p>
           </div>
         </div>
-
-        <div class="notes">
-          <p id="status">Load audio to start the analyser.</p>
-          <p>
-            This preview uses a browser analyser, not the offline `analysis.json` pipeline. The
-            point is fast visual iteration on resonance-field mapping.
-          </p>
         </div>
       </section>
 
       <section class="viewport-panel">
-        <div class="viewport-stage">
-          <canvas id="previewWgpu" width="1280" height="1280"></canvas>
-          <canvas id="previewGl" width="1280" height="1280"></canvas>
-          <canvas id="preview" width="1280" height="1280"></canvas>
+        <div class="viewport-stage-shell">
+          <div class="viewport-stage">
+            <canvas id="previewWgpu" width="1280" height="1280"></canvas>
+            <canvas id="previewGl" width="1280" height="1280"></canvas>
+            <canvas id="preview" width="1280" height="1280"></canvas>
+          </div>
         </div>
       </section>
     </main>
+
+    <div class="panel-edge-hotspot" aria-hidden="true">
+      <button id="panelCollapseHandle" class="panel-toggle panel-toggle--edge" type="button" aria-expanded="true" aria-label="Collapse control panel">
+        <svg class="panel-toggle__icon" viewBox="6 4 15 16" aria-hidden="true">
+          <polyline points="14 5 7 12 14 19"></polyline>
+          <polyline points="20 5 13 12 20 19"></polyline>
+        </svg>
+      </button>
+    </div>
+
+    <div class="panel-left-hotspot" aria-hidden="true">
+      <button id="panelExpandHandle" class="panel-toggle panel-toggle--edge panel-toggle--left" type="button" aria-expanded="false" aria-label="Expand control panel">
+        <svg class="panel-toggle__icon" viewBox="3 4 15 16" aria-hidden="true">
+          <polyline points="10 5 17 12 10 19"></polyline>
+          <polyline points="4 5 11 12 4 19"></polyline>
+        </svg>
+      </button>
+    </div>
+
+    <div id="colorPickerPopover" class="color-picker-popover" hidden>
+      <div class="color-picker" role="dialog" aria-label="Color picker">
+        <div id="colorPickerSurface" class="color-picker__surface" aria-label="Saturation and brightness field">
+          <div class="color-picker__surface-white"></div>
+          <div class="color-picker__surface-black"></div>
+          <svg id="colorPickerHandle" class="color-picker__surface-handle" viewBox="0 0 18 18" aria-hidden="true">
+            <circle cx="9" cy="9" r="7"></circle>
+          </svg>
+        </div>
+        <div class="color-picker__controls">
+          <div id="colorPickerPreview" class="color-picker__preview" aria-hidden="true"></div>
+          <label class="color-picker__hue">
+            <span class="native-control-hidden">Hue</span>
+            <div class="color-picker__hue-track">
+              <input id="colorPickerHue" type="range" min="0" max="360" step="1" value="0" />
+              <svg id="colorPickerHueHandle" class="color-picker__hue-handle" viewBox="0 0 18 18" aria-hidden="true">
+                <circle cx="9" cy="9" r="7"></circle>
+              </svg>
+            </div>
+          </label>
+        </div>
+        <div class="color-picker__inputs">
+          <label class="color-picker__field color-picker__field--hex">
+            <span>HEX</span>
+            <input id="colorPickerHex" type="text" value="#000000" maxlength="7" spellcheck="false" />
+          </label>
+          <label class="color-picker__field">
+            <span>R</span>
+            <input id="colorPickerR" type="number" min="0" max="255" value="0" />
+          </label>
+          <label class="color-picker__field">
+            <span>G</span>
+            <input id="colorPickerG" type="number" min="0" max="255" value="0" />
+          </label>
+          <label class="color-picker__field">
+            <span>B</span>
+            <input id="colorPickerB" type="number" min="0" max="255" value="0" />
+          </label>
+        </div>
+        <p id="colorPickerValue" class="color-picker__value">#000000</p>
+      </div>
+    </div>
 
     <script type="module" src="./app/main.ts"></script>
   </body>

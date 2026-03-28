@@ -89,7 +89,7 @@ const state: AppState = {
   displayMode: "sum",
   combineMode: "signed",
   singleModeView: "amplitude",
-  frameRateLimit: "auto",
+  frameRateLimit: "60",
   plateShape: "square",
   activeTheme: "lab",
   lowBandColor: [...THEME_PRESETS.lab.low],

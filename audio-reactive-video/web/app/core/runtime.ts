@@ -138,34 +138,60 @@ function profileSectionEnd(frameProfile: FrameProfile | null, name: string, star
   frameProfile.sections[name] = (frameProfile.sections[name] || 0) + (performance.now() - startTime);
 }
 
+const PROFILE_LABELS: Record<string, string> = {
+  frame: "frame",
+  updateModeState: "audioUpdate",
+  webgpuField: "wgField",
+  webgpuReduce: "wgPost",
+  webgpuShade: "wgPresent",
+  gpuAccumulate: "legacyGpuField",
+  gpuShade: "webglPresent",
+  gpuReadback: "gpuReadback",
+  cpuAccumulate: "cpuField",
+  fieldPost: "legacyFieldPost",
+  cpuShade: "cpuShade",
+  isoline: "cpuContours",
+  glowContours: "cpuGlow",
+  composite: "cpuComposite",
+};
+
+const PROFILE_OVERLAY_UPDATE_INTERVAL = 24;
+
 function finishFrameProfile(frameProfile: FrameProfile | null): void {
   if (!frameProfile) {
     return;
   }
-  frameProfile.sections.frame = performance.now() - frameProfile.start;
+  const frameEnd = performance.now();
+  frameProfile.sections.frame = frameEnd - frameProfile.start;
   for (const name of profiler.order) {
     const value = frameProfile.sections[name] || 0;
     const previous = profiler.samples[name] ?? value;
     profiler.samples[name] = previous * 0.84 + value * 0.16;
   }
-  const instantaneousFps = 1000 / Math.max(frameProfile.sections.frame, 1e-6);
-  profiler.fps = profiler.fps === 0
-    ? instantaneousFps
-    : profiler.fps * 0.84 + instantaneousFps * 0.16;
+  if (profiler.lastFrameTimestamp > 0) {
+    const frameInterval = frameProfile.start - profiler.lastFrameTimestamp;
+    const instantaneousFps = 1000 / Math.max(frameInterval, 1e-6);
+    profiler.fps = profiler.fps === 0
+      ? instantaneousFps
+      : profiler.fps * 0.84 + instantaneousFps * 0.16;
+  }
+  profiler.lastFrameTimestamp = frameProfile.start;
   profiler.frameCount += 1;
-  if (!profiler.overlay || profiler.frameCount % 12 !== 0) {
+  if (!profiler.overlay || profiler.frameCount % PROFILE_OVERLAY_UPDATE_INTERVAL !== 0) {
     return;
   }
   const lines = [
     `profile avg (${profiler.frameCount}f)`,
     `renderer`.padEnd(15) + ` ${state.activeRenderer}`,
     `presenter`.padEnd(15) + ` ${state.activePresentation}`,
-    `mode`.padEnd(15) + ` ${rendererFlags.directGpuPresentation ? "prefer-webgl" : "stable"}`,
+    `style`.padEnd(15) + ` ${state.renderStyle}`,
+    `combine`.padEnd(15) + ` ${state.combineMode}/${state.displayMode}`,
     `limit`.padEnd(15) + ` ${state.frameRateLimit === "auto" ? "auto" : "60 fps"}`,
     `fps`.padEnd(15) + ` ${profiler.fps.toFixed(1)}`,
   ];
   for (const name of profiler.order) {
-    lines.push(`${name.padEnd(15)} ${profiler.samples[name].toFixed(2)} ms`);
+    const label = PROFILE_LABELS[name] ?? name;
+    lines.push(`${label.padEnd(15)} ${profiler.samples[name].toFixed(2)} ms`);
   }
   profiler.overlay.textContent = lines.join("\n");
 }
@@ -273,14 +299,14 @@ function syncControlVisibility() {
   glowThicknessWrap.classList.toggle("is-hidden", !isGlow);
   glowSpreadWrap.classList.toggle("is-hidden", !isGlow);
   glowIntensityWrap.classList.toggle("is-hidden", !isGlow);
-  colorSeparationWrap.classList.toggle("is-hidden", !isGlow);
-  adaptiveColorMixWrap.classList.toggle("is-hidden", !isGlow);
+  colorSeparationWrap.classList.add("is-hidden");
+  adaptiveColorMixWrap.classList.add("is-hidden");
   themeWrap.classList.toggle("is-hidden", !isGlow);
   lowColorWrap.classList.toggle("is-hidden", !isGlow);
   midColorWrap.classList.toggle("is-hidden", !isGlow);
   highColorWrap.classList.toggle("is-hidden", !isGlow);
-  nodalFocusWrap.classList.toggle("is-hidden", !isGlow);
-  contrastWrap.classList.toggle("is-hidden", !isGlow);
+  nodalFocusWrap.classList.add("is-hidden");
+  contrastWrap.classList.add("is-hidden");
   combineModeWrap.classList.toggle("is-hidden", isSingle);
   singleModeWrap.classList.toggle("is-hidden", !isSingle);
   modeLabel.classList.toggle("is-hidden", !isSingle);

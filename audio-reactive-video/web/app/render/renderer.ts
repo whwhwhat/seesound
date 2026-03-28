@@ -45,6 +45,8 @@ import {
   renderSignedFieldWithWebGpu,
 } from "./webgpu";
 
+const FRAME_LIMIT_TOLERANCE_MS = 1.25;
+
 function renderField() {
   const frameProfile = beginFrameProfile();
   gpuFieldValidation.frame += 1;
@@ -189,7 +191,11 @@ function tick() {
   }
   const targetFrameMs = state.frameRateLimit === "60" ? 1000 / 60 : 0;
   const now = performance.now();
-  if (targetFrameMs > 0 && state.lastAnimationTimestamp > 0 && now - state.lastAnimationTimestamp < targetFrameMs) {
+  if (
+    targetFrameMs > 0 &&
+    state.lastAnimationTimestamp > 0 &&
+    now - state.lastAnimationTimestamp < targetFrameMs - FRAME_LIMIT_TOLERANCE_MS
+  ) {
     state.animationFrame = window.requestAnimationFrame(tick);
     return;
   }

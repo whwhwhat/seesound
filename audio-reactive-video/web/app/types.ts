@@ -113,6 +113,7 @@ export interface ProfilerState {
   overlay: HTMLPreElement | null;
   frameCount: number;
   fps: number;
+  lastFrameTimestamp: number;
   samples: Record<string, number>;
   order: string[];
 }

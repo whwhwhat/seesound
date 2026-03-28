@@ -54,6 +54,7 @@ const profiler: ProfilerState = {
   overlay: null,
   frameCount: 0,
   fps: 0,
+  lastFrameTimestamp: 0,
   samples: Object.create(null),
   order: [
     "frame",
@@ -62,7 +63,6 @@ const profiler: ProfilerState = {
     "webgpuReduce",
     "webgpuShade",
     "gpuAccumulate",
-    "gpuShade",
     "gpuReadback",
     "cpuAccumulate",
     "fieldPost",

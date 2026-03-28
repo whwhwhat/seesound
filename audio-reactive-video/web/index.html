@@ -30,6 +30,33 @@
         <div class="controls-section">
           <p class="section-title">Display</p>
           <div class="control-grid">
+            <label id="themeWrap">
+              <span>Theme</span>
+              <select id="themeSelect">
+                <option value="lab">Lab Green</option>
+                <option value="amber">Amber Mist</option>
+                <option value="ice">Ice Cyan</option>
+                <option value="heat">Heatmap</option>
+                <option value="mono">Monochrome</option>
+                <option value="custom">Custom</option>
+              </select>
+              <small class="control-help">Preset frequency palettes for glow mode.</small>
+            </label>
+            <label id="lowColorWrap">
+              <span>Low color</span>
+              <input id="lowColor" type="color" value="#6c7a2b" />
+              <small class="control-help">Low-frequency anchor color.</small>
+            </label>
+            <label id="midColorWrap">
+              <span>Mid color</span>
+              <input id="midColor" type="color" value="#bcde48" />
+              <small class="control-help">Mid-band anchor color.</small>
+            </label>
+            <label id="highColorWrap">
+              <span>High color</span>
+              <input id="highColor" type="color" value="#bcf4ff" />
+              <small class="control-help">High-frequency anchor color.</small>
+            </label>
             <label>
               <span>Plate shape</span>
               <div class="segmented-control" id="plateShape">
@@ -92,33 +119,6 @@
             <input id="adaptiveColorMix" type="range" min="0.00" max="1.00" step="0.01" value="0.35" />
             <output for="adaptiveColorMix">0.35</output>
             <small class="control-help">Blend fixed frequency tint with track-adaptive color spacing. Suggested: `0.2-0.6`.</small>
-          </label>
-          <label id="themeWrap">
-            <span>Theme</span>
-            <select id="themeSelect">
-              <option value="lab">Lab Green</option>
-              <option value="amber">Amber Mist</option>
-              <option value="ice">Ice Cyan</option>
-              <option value="heat">Heatmap</option>
-              <option value="mono">Monochrome</option>
-              <option value="custom">Custom</option>
-            </select>
-            <small class="control-help">Preset frequency palettes for glow mode.</small>
-          </label>
-          <label id="lowColorWrap">
-            <span>Low color</span>
-            <input id="lowColor" type="color" value="#6c7a2b" />
-            <small class="control-help">Low-frequency anchor color.</small>
-          </label>
-          <label id="midColorWrap">
-            <span>Mid color</span>
-            <input id="midColor" type="color" value="#bcde48" />
-            <small class="control-help">Mid-band anchor color.</small>
-          </label>
-          <label id="highColorWrap">
-            <span>High color</span>
-            <input id="highColor" type="color" value="#bcf4ff" />
-            <small class="control-help">High-frequency anchor color.</small>
           </label>
           <label>
             <span>Display mode</span>

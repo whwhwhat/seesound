@@ -21,6 +21,9 @@ export type CombineMode = "signed" | "residual" | "percentile";
 export type SingleModeView = "amplitude" | "oscillation";
 export type FrameRateLimit = "auto" | "60";
 export type PlateShape = "square" | "circle";
+export type VisualMode = "spectral" | "crystal";
+export type CrystalMaterial = "prism" | "opal" | "basalt";
+export type CrystalPalette = "glacial" | "verdigris" | "ember";
 export type ThemeKey =
   | "lab"
   | "amber"
@@ -104,6 +107,14 @@ export interface AppState {
   singleModeView: SingleModeView;
   frameRateLimit: FrameRateLimit;
   plateShape: PlateShape;
+  visualMode: VisualMode;
+  crystalMaterial: CrystalMaterial;
+  crystalPalette: CrystalPalette;
+  crystalPitchProfile: Float32Array;
+  crystalTonalFocus: number;
+  crystalFlow: number;
+  crystalTension: number;
+  crystalBloom: number;
   activeTheme: ActiveTheme;
   lowBandColor: RGBColor;
   midBandColor: RGBColor;

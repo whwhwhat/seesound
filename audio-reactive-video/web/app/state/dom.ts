@@ -50,7 +50,32 @@ const fileInput = requireElement<HTMLInputElement>("audioFile");
 const panelCollapseHandle = requireElement<HTMLButtonElement>("panelCollapseHandle");
 const panelExpandHandle = requireElement<HTMLButtonElement>("panelExpandHandle");
 const currentTrackNode = requireElement<HTMLParagraphElement>("currentTrack");
+const heroTitle = requireElement<HTMLHeadingElement>("heroTitle");
+const heroLede = requireElement<HTMLParagraphElement>("heroLede");
+const playbackKicker = requireElement<HTMLParagraphElement>("playbackKicker");
 const statusNode = requireElement<HTMLParagraphElement>("status");
+const visualModeButtons = getSegmentedButtons("visualMode", "button[data-visual-mode]");
+const crystalModeNote = requireElement<HTMLParagraphElement>("crystalModeNote");
+const crystalMaterialBlock = requireElement<HTMLElement>("crystalMaterialBlock");
+const crystalMaterialButtons = getSegmentedButtons("crystalMaterial", "button[data-crystal-material]");
+const crystalPaletteBlock = requireElement<HTMLElement>("crystalPaletteBlock");
+const crystalPaletteButtons = getSegmentedButtons("crystalPalette", "button[data-crystal-palette]");
+const crystalTonalFocusWrap = requireElement<HTMLLabelElement>("crystalTonalFocusWrap");
+const crystalFlowWrap = requireElement<HTMLLabelElement>("crystalFlowWrap");
+const crystalTensionWrap = requireElement<HTMLLabelElement>("crystalTensionWrap");
+const crystalBloomWrap = requireElement<HTMLLabelElement>("crystalBloomWrap");
+const crystalTonalFocusInput = requireElement<HTMLInputElement>("crystalTonalFocus");
+const crystalFlowInput = requireElement<HTMLInputElement>("crystalFlow");
+const crystalTensionInput = requireElement<HTMLInputElement>("crystalTension");
+const crystalBloomInput = requireElement<HTMLInputElement>("crystalBloom");
+const crystalTonalFocusOutput = requireOutput("crystalTonalFocus");
+const crystalFlowOutput = requireOutput("crystalFlow");
+const crystalTensionOutput = requireOutput("crystalTension");
+const crystalBloomOutput = requireOutput("crystalBloom");
+const plateShapeBlock = requireElement<HTMLElement>("plateShapeBlock");
+const renderStyleBlock = requireElement<HTMLElement>("renderStyleBlock");
+const fieldBehaviorSection = requireElement<HTMLElement>("fieldBehaviorSection");
+const advancedPanel = requireElement<HTMLDetailsElement>("advancedPanel");
 const plateShapeButtons = getSegmentedButtons("plateShape", "button[data-shape]");
 const angularRotationWrap = requireElement<HTMLElement>("angularRotationWrap");
 const renderStyleButtons = getSegmentedButtons("renderStyle", "button[data-render-style]");
@@ -137,6 +162,7 @@ const controls = Object.fromEntries(
 export {
   adaptiveColorMixWrap,
   appShell,
+  advancedPanel,
   angularRotationWrap,
   atmosphereEnabledInput,
   atmosphereWrap,
@@ -168,8 +194,26 @@ export {
   controlPanelViewport,
   controls,
   currentTrackNode,
+  crystalMaterialBlock,
+  crystalMaterialButtons,
+  crystalPaletteBlock,
+  crystalPaletteButtons,
   ctx,
+  crystalBloomInput,
+  crystalBloomOutput,
+  crystalBloomWrap,
+  crystalFlowInput,
+  crystalFlowOutput,
+  crystalFlowWrap,
+  crystalModeNote,
+  crystalTensionInput,
+  crystalTensionOutput,
+  crystalTensionWrap,
+  crystalTonalFocusInput,
+  crystalTonalFocusOutput,
+  crystalTonalFocusWrap,
   displayModeButtons,
+  fieldBehaviorSection,
   fileInput,
   frameRateLimitButtons,
   glCanvas,
@@ -179,6 +223,8 @@ export {
   highColorButton,
   highColorInput,
   highColorWrap,
+  heroLede,
+  heroTitle,
   lowColorButton,
   lowColorInput,
   lowColorWrap,
@@ -190,8 +236,11 @@ export {
   numericControls,
   panelCollapseHandle,
   panelExpandHandle,
+  playbackKicker,
+  plateShapeBlock,
   plateShapeButtons,
   renderStyleButtons,
+  renderStyleBlock,
   singleModeIndexOutput,
   singleModeViewButtons,
   singleModeViewWrap,
@@ -205,5 +254,6 @@ export {
   themeTrigger,
   themeValue,
   themeWrap,
+  visualModeButtons,
   wgpuCanvas,
 };

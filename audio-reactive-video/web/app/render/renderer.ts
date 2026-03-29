@@ -44,6 +44,9 @@ import {
   clearWebGpuPresentation,
   renderSignedFieldWithWebGpu,
 } from "./webgpu";
+import {
+  renderCrystalScene,
+} from "./crystal-webgpu";
 
 const FRAME_LIMIT_TOLERANCE_MS = 1.25;
 
@@ -54,6 +57,24 @@ function renderField() {
   let profileStart = profileSectionStart(frameProfile);
   const { bands, rms, centroid, isPlaying } = updateModeState();
   profileSectionEnd(frameProfile, "updateModeState", profileStart);
+
+  if (state.visualMode === "crystal") {
+    clearGpuPresentation();
+    const rendered = renderCrystalScene({
+      bands,
+      rms,
+      centroid,
+      isPlaying,
+    });
+    if (!rendered) {
+      clearWebGpuPresentation();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    } else {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    finishFrameProfile(frameProfile);
+    return;
+  }
 
   const frameContext = buildFrameContext({
     bands,

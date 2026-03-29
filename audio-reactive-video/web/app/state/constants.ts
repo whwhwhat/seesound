@@ -1,4 +1,5 @@
 import type {
+  CrystalPalette,
   RGBColor,
   ThemeKey,
   ThemePreset,
@@ -64,6 +65,23 @@ const THEME_PRESETS: Record<ThemeKey, ThemePreset> = {
     high: [172, 240, 255],
   },
 };
+const CRYSTAL_PALETTES: Record<CrystalPalette, ThemePreset> = {
+  glacial: {
+    low: [36, 62, 88],
+    mid: [116, 196, 224],
+    high: [226, 247, 255],
+  },
+  verdigris: {
+    low: [28, 74, 68],
+    mid: [82, 186, 156],
+    high: [215, 248, 226],
+  },
+  ember: {
+    low: [66, 26, 28],
+    mid: [190, 92, 64],
+    high: [255, 218, 154],
+  },
+};
 const BASE_BG_COLOR: RGBColor = [2, 6, 9];
 const COLOR_FOCUS_LOW_HZ = 60;
 const COLOR_FOCUS_HIGH_HZ = 6000;
@@ -73,6 +91,7 @@ export {
   BESSEL_ZEROS,
   COLOR_FOCUS_HIGH_HZ,
   COLOR_FOCUS_LOW_HZ,
+  CRYSTAL_PALETTES,
   FFT_SIZE,
   THEME_PRESETS,
   fieldSize,

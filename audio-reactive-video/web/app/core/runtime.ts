@@ -7,6 +7,7 @@ import {
   THEME_PRESETS,
 } from "../state/constants";
 import {
+  advancedPanel,
   adaptiveColorMixWrap,
   angularRotationWrap,
   atmosphereWrap,
@@ -16,6 +17,14 @@ import {
   combineModeWrap,
   contrastWrap,
   controls,
+  crystalBloomWrap,
+  crystalFlowWrap,
+  crystalMaterialBlock,
+  crystalModeNote,
+  crystalPaletteBlock,
+  crystalTensionWrap,
+  crystalTonalFocusWrap,
+  fieldBehaviorSection,
   glowSpreadWrap,
   glowIntensityWrap,
   glowThicknessWrap,
@@ -28,6 +37,8 @@ import {
   modeLabel,
   nodalFocusWrap,
   numericControls,
+  plateShapeBlock,
+  renderStyleBlock,
   singleModeIndexOutput,
   singleModeViewWrap,
   singleModeWrap,
@@ -291,27 +302,39 @@ function updateModeLabel() {
 }
 
 function syncControlVisibility() {
+  const isCrystal = state.visualMode === "crystal";
   const isGlow = state.renderStyle === "glow";
   const isSingle = state.displayMode === "single";
   const isCircle = state.plateShape === "circle";
+  crystalModeNote.classList.toggle("is-hidden", !isCrystal);
+  crystalMaterialBlock.classList.toggle("is-hidden", !isCrystal);
+  crystalPaletteBlock.classList.toggle("is-hidden", !isCrystal);
+  crystalTonalFocusWrap.classList.toggle("is-hidden", !isCrystal);
+  crystalFlowWrap.classList.toggle("is-hidden", !isCrystal);
+  crystalTensionWrap.classList.toggle("is-hidden", !isCrystal);
+  crystalBloomWrap.classList.toggle("is-hidden", !isCrystal);
+  plateShapeBlock.classList.toggle("is-hidden", isCrystal);
+  renderStyleBlock.classList.toggle("is-hidden", isCrystal);
+  fieldBehaviorSection.classList.toggle("is-hidden", isCrystal);
+  advancedPanel.classList.toggle("is-hidden", isCrystal);
   angularRotationWrap.classList.toggle("is-hidden", !isCircle);
-  atmosphereWrap.classList.toggle("is-hidden", false);
-  glowThicknessWrap.classList.toggle("is-hidden", !isGlow);
-  glowSpreadWrap.classList.toggle("is-hidden", !isGlow);
-  glowIntensityWrap.classList.toggle("is-hidden", !isGlow);
+  atmosphereWrap.classList.toggle("is-hidden", isCrystal);
+  glowThicknessWrap.classList.toggle("is-hidden", isCrystal || !isGlow);
+  glowSpreadWrap.classList.toggle("is-hidden", isCrystal || !isGlow);
+  glowIntensityWrap.classList.toggle("is-hidden", isCrystal || !isGlow);
   colorSeparationWrap.classList.add("is-hidden");
   adaptiveColorMixWrap.classList.add("is-hidden");
-  themeWrap.classList.toggle("is-hidden", false);
-  lowColorWrap.classList.toggle("is-hidden", false);
-  midColorWrap.classList.toggle("is-hidden", false);
-  highColorWrap.classList.toggle("is-hidden", false);
-  nodalFocusWrap.classList.add("is-hidden");
-  contrastWrap.classList.add("is-hidden");
-  combineModeWrap.classList.toggle("is-hidden", isSingle);
-  singleModeWrap.classList.toggle("is-hidden", !isSingle);
-  modeLabel.classList.toggle("is-hidden", !isSingle);
-  bandLabel.classList.toggle("is-hidden", !isSingle);
-  singleModeViewWrap.classList.toggle("is-hidden", !isSingle);
+  themeWrap.classList.toggle("is-hidden", isCrystal);
+  lowColorWrap.classList.toggle("is-hidden", isCrystal);
+  midColorWrap.classList.toggle("is-hidden", isCrystal);
+  highColorWrap.classList.toggle("is-hidden", isCrystal);
+  nodalFocusWrap.classList.toggle("is-hidden", true);
+  contrastWrap.classList.toggle("is-hidden", true);
+  combineModeWrap.classList.toggle("is-hidden", isCrystal || isSingle);
+  singleModeWrap.classList.toggle("is-hidden", isCrystal || !isSingle);
+  modeLabel.classList.toggle("is-hidden", isCrystal || !isSingle);
+  bandLabel.classList.toggle("is-hidden", isCrystal || !isSingle);
+  singleModeViewWrap.classList.toggle("is-hidden", isCrystal || !isSingle);
 }
 
 function syncThemeInputs() {

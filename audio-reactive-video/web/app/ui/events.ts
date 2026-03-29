@@ -8,6 +8,16 @@ import {
   combineModeValue,
   controlPanelViewport,
   controls,
+  crystalBloomInput,
+  crystalBloomOutput,
+  crystalFlowInput,
+  crystalFlowOutput,
+  crystalMaterialButtons,
+  crystalPaletteButtons,
+  crystalTensionInput,
+  crystalTensionOutput,
+  crystalTonalFocusInput,
+  crystalTonalFocusOutput,
   displayModeButtons,
   frameRateLimitButtons,
   highColorInput,
@@ -24,6 +34,7 @@ import {
   themeSelect,
   themeTrigger,
   themeValue,
+  visualModeButtons,
   glCanvas,
   wgpuCanvas,
 } from "../state/dom";
@@ -45,6 +56,9 @@ import {
   refreshThemeColorSwatches,
 } from "./color-picker";
 import {
+  applyModeCopy,
+} from "./mode-copy";
+import {
   clearSpatialCache,
 } from "../core/geometry";
 import {
@@ -55,9 +69,14 @@ import {
   handleWebGpuResize,
 } from "../render/webgpu";
 import {
+  primeCrystalRenderer,
+} from "../render/crystal-webgpu";
+import {
   requestRender,
 } from "../render/renderer";
 import type {
+  CrystalMaterial,
+  CrystalPalette,
   CombineMode,
   ThemeKey,
 } from "../types";
@@ -75,6 +94,34 @@ function bindEventHandlers() {
       requestRender();
     });
   }
+
+  const bindCrystalRange = (
+    input: HTMLInputElement,
+    output: HTMLOutputElement,
+    onUpdate: (value: number) => void,
+  ) => {
+    const sync = () => {
+      output.value = input.value;
+      output.textContent = input.value;
+      onUpdate(Number.parseFloat(input.value));
+      requestRender();
+    };
+    sync();
+    input.addEventListener("input", sync);
+  };
+
+  bindCrystalRange(crystalTonalFocusInput, crystalTonalFocusOutput, (value) => {
+    state.crystalTonalFocus = value;
+  });
+  bindCrystalRange(crystalFlowInput, crystalFlowOutput, (value) => {
+    state.crystalFlow = value;
+  });
+  bindCrystalRange(crystalTensionInput, crystalTensionOutput, (value) => {
+    state.crystalTension = value;
+  });
+  bindCrystalRange(crystalBloomInput, crystalBloomOutput, (value) => {
+    state.crystalBloom = value;
+  });
 
   atmosphereEnabledInput.addEventListener("change", () => {
     requestRender();
@@ -199,6 +246,47 @@ function bindEventHandlers() {
         state.renderStyle === "isoline"
           ? "Showing extracted zero-contours."
           : "Showing glow-based nodal rendering.";
+      requestRender();
+    });
+  });
+
+  visualModeButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      state.visualMode = button.dataset.visualMode === "crystal" ? "crystal" : "spectral";
+      visualModeButtons.forEach((item) => {
+        item.classList.toggle("is-active", item === button);
+      });
+      syncControlVisibility();
+      applyModeCopy();
+      statusNode.textContent = state.visualMode === "crystal"
+        ? "Crystal mode active. Harmonic membrane rendering is driving the scene."
+        : "Spectral mode active. Resonance field rendering is back online.";
+      if (state.visualMode === "crystal") {
+        void primeCrystalRenderer().then(() => {
+          requestRender();
+        });
+        return;
+      }
+      requestRender();
+    });
+  });
+
+  crystalMaterialButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      state.crystalMaterial = (button.dataset.crystalMaterial as CrystalMaterial) || "prism";
+      crystalMaterialButtons.forEach((item) => {
+        item.classList.toggle("is-active", item === button);
+      });
+      requestRender();
+    });
+  });
+
+  crystalPaletteButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      state.crystalPalette = (button.dataset.crystalPalette as CrystalPalette) || "glacial";
+      crystalPaletteButtons.forEach((item) => {
+        item.classList.toggle("is-active", item === button);
+      });
       requestRender();
     });
   });

@@ -502,6 +502,12 @@ output,
 
 .control-grid label.is-hidden,
 .color-row label.is-hidden,
+.custom-select.is-hidden,
+.color-swatch-control.is-hidden,
+.control-block.is-hidden,
+.controls-section.is-hidden,
+.advanced-panel.is-hidden,
+.control-toggle.is-hidden,
 .mode-label.is-hidden {
   display: none;
 }

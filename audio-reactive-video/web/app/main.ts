@@ -13,6 +13,9 @@ import {
   bindAudioPlayer,
 } from "./ui/audio-player";
 import {
+  applyModeCopy,
+} from "./ui/mode-copy";
+import {
   bindColorPicker,
 } from "./ui/color-picker";
 import {
@@ -25,6 +28,9 @@ import {
   primeWebGpuRenderer,
 } from "./render/webgpu";
 import {
+  primeCrystalRenderer,
+} from "./render/crystal-webgpu";
+import {
   requestRender,
 } from "./render/renderer";
 
@@ -34,10 +40,12 @@ state.modeState = buildModes(Math.round(numericControls.modeCount));
 controls.singleModeIndex.max = String(Math.round(numericControls.modeCount));
 updateModeLabel();
 syncControlVisibility();
+applyModeCopy();
 bindAudioPlayer();
 bindColorPicker();
 bindEventHandlers();
 window.dispatchEvent(new Event("resize"));
+void primeCrystalRenderer();
 primeWebGpuRenderer().then((ready) => {
   if (ready) {
     requestRender();

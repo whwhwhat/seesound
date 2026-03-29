@@ -17,6 +17,15 @@ import {
   ensureAudioGraph,
 } from "../core/runtime";
 import {
+  getDefaultTrackLabel,
+  getEndedStatusText,
+  getIdleStatusText,
+  getLoadedStatusText,
+  getPausedStatusText,
+  getPlayErrorStatusText,
+  getRunningStatusText,
+} from "./mode-copy";
+import {
   requestRender,
   startAnimationLoop,
   stopAnimationLoop,
@@ -84,7 +93,7 @@ function bindAudioPlayer() {
       try {
         await audio.play();
       } catch {
-        statusNode.textContent = "Unable to start playback. Try loading the track again.";
+        statusNode.textContent = getPlayErrorStatusText();
       }
       return;
     }
@@ -110,7 +119,7 @@ function bindAudioPlayer() {
     audio.src = state.currentAudioObjectUrl;
     audio.load();
     currentTrackNode.textContent = state.currentAudioFileName;
-    statusNode.textContent = `Loaded ${file.name}. Press play to drive the field.`;
+    statusNode.textContent = getLoadedStatusText(file.name);
     syncAudioUi();
     requestRender();
   });
@@ -151,20 +160,20 @@ function bindAudioPlayer() {
     if (state.audioContext) {
       await state.audioContext.resume();
     }
-    statusNode.textContent = "Running realtime resonance preview.";
+    statusNode.textContent = getRunningStatusText();
     syncAudioUi();
     startAnimationLoop();
   });
 
   audio.addEventListener("pause", () => {
-    statusNode.textContent = "Playback paused. Field is frozen at the current state.";
+    statusNode.textContent = getPausedStatusText();
     syncAudioUi();
     stopAnimationLoop();
     requestRender();
   });
 
   audio.addEventListener("ended", () => {
-    statusNode.textContent = "Playback ended. Field is frozen at the final state.";
+    statusNode.textContent = getEndedStatusText();
     syncAudioUi();
     stopAnimationLoop();
     requestRender();
@@ -173,7 +182,11 @@ function bindAudioPlayer() {
   audio.addEventListener("loadedmetadata", syncAudioUi);
   audio.addEventListener("timeupdate", syncAudioUi);
   audio.addEventListener("durationchange", syncAudioUi);
-  audio.addEventListener("emptied", syncAudioUi);
+  audio.addEventListener("emptied", () => {
+    currentTrackNode.textContent = getDefaultTrackLabel();
+    statusNode.textContent = getIdleStatusText();
+    syncAudioUi();
+  });
   setVolumeOpen(false);
   syncAudioUi();
 }

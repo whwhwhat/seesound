@@ -13,8 +13,8 @@
         <div class="panel-header">
           <div class="panel-header-copy">
             <p class="brand-mark">SeeSound</p>
-            <h1>Shape sound into a living resonance field.</h1>
-            <p class="lede">
+            <h1 id="heroTitle">Shape sound into a living resonance field.</h1>
+            <p id="heroLede" class="lede">
               Inspired by Chladni figures and resonant plate patterns, this canvas turns audio
               energy into shifting nodal geometry.
             </p>
@@ -25,7 +25,7 @@
           <div class="control-group playback-group">
             <div class="playback-header">
               <p class="section-title">Playback</p>
-              <p class="session-kicker">Start with a track, then shape the field in real time.</p>
+              <p id="playbackKicker" class="session-kicker">Start with a track, then shape the field in real time.</p>
             </div>
             <div class="audio-player">
               <div class="audio-player__row">
@@ -70,6 +70,14 @@
           <div class="controls-section">
             <p class="section-title">Visual Style</p>
             <div class="control-grid">
+              <div class="control-block">
+                <span>Visual mode</span>
+                <div class="segmented-control" id="visualMode">
+                  <button type="button" data-visual-mode="spectral" class="is-active">Spectral</button>
+                  <button type="button" data-visual-mode="crystal">Crystal</button>
+                </div>
+                <small class="control-help">Spectral keeps the current resonance field. Crystal switches to a separate harmonic membrane renderer.</small>
+              </div>
               <div id="themeWrap" class="custom-select">
                 <span>Theme</span>
                 <div class="select-shell">
@@ -130,7 +138,7 @@
                   <small class="control-help">Treble region tint.</small>
                 </div>
               </div>
-              <div class="control-block">
+              <div id="plateShapeBlock" class="control-block">
                 <span>Plate shape</span>
                 <div class="segmented-control" id="plateShape">
                   <button type="button" data-shape="square" class="is-active">Square</button>
@@ -138,7 +146,7 @@
                 </div>
                 <small class="control-help">Square feels architectural. Circle feels more orbital and fluid.</small>
               </div>
-              <div class="control-block">
+              <div id="renderStyleBlock" class="control-block">
                 <span>Render style</span>
                 <div class="segmented-control" id="renderStyle">
                   <button type="button" data-render-style="glow" class="is-active">Glow</button>
@@ -146,6 +154,49 @@
                 </div>
                 <small class="control-help">Glow emphasizes atmosphere. Isoline reveals the nodal skeleton.</small>
               </div>
+              <p id="crystalModeNote" class="mode-label is-hidden">Crystal mode runs on a separate harmonic membrane renderer with its own motion language.</p>
+              <div id="crystalMaterialBlock" class="control-block is-hidden">
+                <span>Crystal material</span>
+                <div class="segmented-control" id="crystalMaterial">
+                  <button type="button" data-crystal-material="prism" class="is-active">Prism</button>
+                  <button type="button" data-crystal-material="opal">Opal</button>
+                  <button type="button" data-crystal-material="basalt">Basalt</button>
+                </div>
+                <small class="control-help">Switches the membrane between luminous prism glass, milky opal, and denser volcanic crystal.</small>
+              </div>
+              <div id="crystalPaletteBlock" class="control-block is-hidden">
+                <span>Crystal palette</span>
+                <div class="segmented-control" id="crystalPalette">
+                  <button type="button" data-crystal-palette="glacial" class="is-active">Glacial</button>
+                  <button type="button" data-crystal-palette="verdigris">Verdigris</button>
+                  <button type="button" data-crystal-palette="ember">Ember</button>
+                </div>
+                <small class="control-help">Dedicated color families for the crystal membrane, separate from spectral themes.</small>
+              </div>
+              <label id="crystalTonalFocusWrap" class="is-hidden">
+                <span>Tonal focus</span>
+                <input id="crystalTonalFocus" type="range" min="0.10" max="2.50" step="0.01" value="1.10" />
+                <output for="crystalTonalFocus">1.10</output>
+                <small class="control-help">Tightens or relaxes harmonic clusters across the membrane.</small>
+              </label>
+              <label id="crystalFlowWrap" class="is-hidden">
+                <span>Membrane flow</span>
+                <input id="crystalFlow" type="range" min="0.00" max="2.00" step="0.01" value="0.72" />
+                <output for="crystalFlow">0.72</output>
+                <small class="control-help">Controls how strongly the surface drifts and carries internal light.</small>
+              </label>
+              <label id="crystalTensionWrap" class="is-hidden">
+                <span>Surface tension</span>
+                <input id="crystalTension" type="range" min="0.10" max="2.50" step="0.01" value="1.00" />
+                <output for="crystalTension">1.00</output>
+                <small class="control-help">Higher tension keeps the crystal flatter and more faceted.</small>
+              </label>
+              <label id="crystalBloomWrap" class="is-hidden">
+                <span>Bloom</span>
+                <input id="crystalBloom" type="range" min="0.10" max="2.50" step="0.01" value="0.95" />
+                <output for="crystalBloom">0.95</output>
+                <small class="control-help">Boosts highlight spill and the internal luminous body.</small>
+              </label>
               <label id="atmosphereWrap" class="control-toggle">
                 <span>Atmosphere background</span>
                 <input id="atmosphereEnabled" type="checkbox" checked />
@@ -172,7 +223,7 @@
             </div>
           </div>
 
-          <div class="controls-section">
+          <div id="fieldBehaviorSection" class="controls-section">
             <p class="section-title">Field Behavior</p>
             <div class="control-grid">
               <label>
@@ -222,7 +273,7 @@
             </div>
           </div>
 
-          <details class="advanced-panel">
+          <details id="advancedPanel" class="advanced-panel">
             <summary>Advanced tuning</summary>
             <div class="controls-section controls-section--advanced">
               <div class="control-grid">

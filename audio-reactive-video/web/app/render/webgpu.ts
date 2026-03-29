@@ -134,6 +134,21 @@ function requireWebGpuContext(): GPUCanvasContext {
   return webGpuState.context;
 }
 
+function getSharedWebGpuPresentationState(): {
+  device: GPUDevice;
+  context: GPUCanvasContext;
+  format: string;
+} | null {
+  if (!webGpuState.device || !webGpuState.context || !webGpuState.canvasFormat) {
+    return null;
+  }
+  return {
+    device: webGpuState.device,
+    context: webGpuState.context,
+    format: webGpuState.canvasFormat,
+  };
+}
+
 function requireInitializedWebGpuState(): InitializedWebGpuState {
   if (
     !webGpuState.adapter ||
@@ -1436,6 +1451,7 @@ function renderSignedFieldWithWebGpu(
 
 export {
   clearWebGpuPresentation,
+  getSharedWebGpuPresentationState,
   handleWebGpuResize,
   primeWebGpuRenderer,
   renderSignedFieldWithWebGpu,

@@ -21,7 +21,16 @@ export type CombineMode = "signed" | "residual" | "percentile";
 export type SingleModeView = "amplitude" | "oscillation";
 export type FrameRateLimit = "auto" | "60";
 export type PlateShape = "square" | "circle";
-export type ThemeKey = "lab" | "amber" | "ice" | "heat" | "mono";
+export type ThemeKey =
+  | "lab"
+  | "amber"
+  | "ice"
+  | "heat"
+  | "mono"
+  | "aurora"
+  | "sunset"
+  | "neon"
+  | "ocean";
 export type ActiveTheme = ThemeKey | "custom";
 export type ActiveRenderer = "legacy" | "webgpu";
 export type ActivePresentation = "cpu" | "webgl" | "native";

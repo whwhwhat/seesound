@@ -20,10 +20,40 @@ struct VertexOut {
 
 @group(0) @binding(0) var<storage, read> segments : array<Segment>;
 @group(0) @binding(1) var<uniform> params : LineParams;
+@group(0) @binding(2) var colorAccumTex : texture_2d<f32>;
+@group(0) @binding(3) var colorWeightTex : texture_2d<f32>;
+@group(0) @binding(4) var fieldTex : texture_2d<f32>;
 
 fn normalizeSafe(vector : vec2f) -> vec2f {
   let lengthSq = max(dot(vector, vector), 1e-8);
   return vector * inverseSqrt(lengthSq);
+}
+
+fn clamp01(value : f32) -> f32 {
+  return clamp(value, 0.0, 1.0);
+}
+
+fn luminance(color : vec3f) -> f32 {
+  return dot(color, vec3f(0.2126, 0.7152, 0.0722));
+}
+
+fn sampleTextureBilinear(tex : texture_2d<f32>, uv : vec2f) -> vec4f {
+  let maxCoordF = vec2f(383.0, 383.0);
+  let maxCoordI = vec2i(383, 383);
+  let coord = clamp(uv, vec2f(0.0), vec2f(1.0)) * 383.0;
+  let base = floor(coord);
+  let frac = coord - base;
+  let i00 = vec2i(base);
+  let i10 = min(i00 + vec2i(1, 0), maxCoordI);
+  let i01 = min(i00 + vec2i(0, 1), maxCoordI);
+  let i11 = min(i00 + vec2i(1, 1), maxCoordI);
+  let s00 = textureLoad(tex, i00, 0);
+  let s10 = textureLoad(tex, i10, 0);
+  let s01 = textureLoad(tex, i01, 0);
+  let s11 = textureLoad(tex, i11, 0);
+  let sx0 = mix(s00, s10, frac.x);
+  let sx1 = mix(s01, s11, frac.x);
+  return mix(sx0, sx1, frac.y);
 }
 
 @vertex
@@ -122,6 +152,24 @@ fn fsMain(
   }
 
   let resolvedAlpha = clamp(alpha, 0.0, 1.0);
-  let resolvedColor = clamp(params.color.rgb / 255.0, vec3f(0.0), vec3f(1.0)) * resolvedAlpha;
-  return vec4f(resolvedColor, resolvedAlpha);
+  let drawSize = max(params.canvasMetrics.w, 1.0);
+  let localUv = clamp((position.xy - vec2f(params.canvasMetrics.z)) / drawSize, vec2f(0.0), vec2f(1.0));
+  let accum = sampleTextureBilinear(colorAccumTex, localUv).rgb;
+  let weight = sampleTextureBilinear(colorWeightTex, localUv).x;
+  let fieldMagnitude = abs(sampleTextureBilinear(fieldTex, localUv).x);
+
+  let fallbackColor = clamp(params.color.rgb, vec3f(0.0), vec3f(255.0));
+  let sampledColor = select(fallbackColor, accum / max(weight, 1e-5), weight > 1e-5);
+  let fallbackLuma = max(luminance(fallbackColor), 1e-4);
+  let sampledLuma = max(luminance(sampledColor), 1e-4);
+  let normalizedSampledColor = clamp(sampledColor * mix(0.9, fallbackLuma / sampledLuma, 0.82), vec3f(0.0), vec3f(255.0));
+  let energy = 1.0 - exp(-weight * params.flags.w);
+  let fieldPulse = 1.0 - exp(-fieldMagnitude * (1.6 + params.style.w * 0.6));
+  let sustainedEnergy = pow(energy, 0.85);
+  let colorMix = clamp01(params.flags.z * (0.18 + sustainedEnergy * 0.34 + fieldPulse * 0.08));
+  let hueColor = mix(fallbackColor, normalizedSampledColor, colorMix);
+  let brightness = 0.78 + params.style.w * 0.1 + sustainedEnergy * 0.24 + fieldPulse * 0.1;
+  let alphaBoost = 0.76 + sustainedEnergy * 0.3 + fieldPulse * 0.08;
+  let resolvedColor = clamp(hueColor * brightness / 255.0, vec3f(0.0), vec3f(1.0)) * clamp01(resolvedAlpha * alphaBoost);
+  return vec4f(resolvedColor, clamp01(resolvedAlpha * alphaBoost));
 }

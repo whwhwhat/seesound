@@ -43,6 +43,26 @@ const THEME_PRESETS: Record<ThemeKey, ThemePreset> = {
     mid: [160, 188, 168],
     high: [232, 240, 235],
   },
+  aurora: {
+    low: [36, 64, 96],
+    mid: [88, 224, 182],
+    high: [214, 255, 238],
+  },
+  sunset: {
+    low: [86, 32, 72],
+    mid: [234, 110, 88],
+    high: [255, 214, 132],
+  },
+  neon: {
+    low: [34, 18, 86],
+    mid: [255, 54, 139],
+    high: [90, 246, 255],
+  },
+  ocean: {
+    low: [18, 58, 88],
+    mid: [42, 140, 196],
+    high: [172, 240, 255],
+  },
 };
 const BASE_BG_COLOR: RGBColor = [2, 6, 9];
 const COLOR_FOCUS_LOW_HZ = 60;

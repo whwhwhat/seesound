@@ -33,6 +33,12 @@ import {
 
 let colorPickerBound = false;
 
+function refreshThemeColorSwatches() {
+  lowColorButton.style.setProperty("--swatch-color", lowColorInput.value);
+  midColorButton.style.setProperty("--swatch-color", midColorInput.value);
+  highColorButton.style.setProperty("--swatch-color", highColorInput.value);
+}
+
 function bindColorPicker() {
   if (colorPickerBound) {
     return;
@@ -293,4 +299,5 @@ function bindColorPicker() {
 
 export {
   bindColorPicker,
+  refreshThemeColorSwatches,
 };

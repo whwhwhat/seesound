@@ -42,6 +42,9 @@ import {
   updateModeLabel,
 } from "../core/runtime";
 import {
+  refreshThemeColorSwatches,
+} from "./color-picker";
+import {
   clearSpatialCache,
 } from "../core/geometry";
 import {
@@ -275,17 +278,13 @@ function bindEventHandlers() {
     if (themeSelect.value === "custom") {
       state.activeTheme = "custom";
       syncThemeInputs();
-      lowColorInput.dispatchEvent(new Event("input", { bubbles: true }));
-      midColorInput.dispatchEvent(new Event("input", { bubbles: true }));
-      highColorInput.dispatchEvent(new Event("input", { bubbles: true }));
+      refreshThemeColorSwatches();
       updateSelectLabel(themeValue, themeSelect);
       requestRender();
       return;
     }
     applyTheme(themeSelect.value as ThemeKey);
-    lowColorInput.dispatchEvent(new Event("input", { bubbles: true }));
-    midColorInput.dispatchEvent(new Event("input", { bubbles: true }));
-    highColorInput.dispatchEvent(new Event("input", { bubbles: true }));
+    refreshThemeColorSwatches();
     updateSelectLabel(themeValue, themeSelect);
     requestRender();
   });

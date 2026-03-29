@@ -366,13 +366,14 @@ function getModeBaseColor(groupIndex: number, groups: number, sampleRate: number
 }
 
 function getThemeLineColor(): RGBColor {
-  return lerpColor(state.midBandColor, state.highBandColor, 0.35);
+  const lowMidBlend = lerpColor(state.lowBandColor, state.midBandColor, 0.62);
+  return lerpColor(lowMidBlend, state.highBandColor, 0.42);
 }
 
 function getThemeGlowPalette(): ThemeGlowPalette {
   const lineColor = getThemeLineColor();
-  const baseColor = lerpColor(lineColor, state.highBandColor, 0.22);
-  const outerColor = lerpColor(state.lowBandColor, lineColor, 0.5);
+  const baseColor = lerpColor(lineColor, state.highBandColor, 0.3);
+  const outerColor = lerpColor(state.lowBandColor, lineColor, 0.42);
   const backdropColor = lerpColor(BASE_BG_COLOR, lineColor, 0.18);
   const atmosphereCore = lerpColor(BASE_BG_COLOR, lineColor, 0.16);
   const atmosphereOuter = lerpColor(BASE_BG_COLOR, outerColor, 0.1);

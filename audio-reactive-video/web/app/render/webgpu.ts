@@ -1157,6 +1157,9 @@ function encodeLinePass(
   blurRadius: number,
   alpha: number,
   crisp: boolean,
+  dynamicColorMix: number,
+  energyGain: number,
+  brightnessBias: number,
   loadOp = "load",
   pipeline?: GPURenderPipeline,
 ): void {
@@ -1165,9 +1168,9 @@ function encodeLinePass(
   const lineParamsBuffer = webGpuState.lineParamsBuffers[bufferIndex];
   const lineParams = new Float32Array([
     metrics.width, metrics.height, metrics.inset, metrics.drawSize,
-    lineWidth * metrics.scale, blurRadius * metrics.scale, alpha, 0,
+    lineWidth * metrics.scale, blurRadius * metrics.scale, alpha, brightnessBias,
     color[0], color[1], color[2], 0,
-    state.plateShape === "circle" ? 1 : 0, crisp ? 1 : 0, 0, 0,
+    state.plateShape === "circle" ? 1 : 0, crisp ? 1 : 0, dynamicColorMix, energyGain,
   ]);
   requireWebGpuDevice().queue.writeBuffer(lineParamsBuffer, 0, lineParams);
 
@@ -1176,6 +1179,9 @@ function encodeLinePass(
     entries: [
       { binding: 0, resource: { buffer: readyState.segmentBuffer } },
       { binding: 1, resource: { buffer: lineParamsBuffer } },
+      { binding: 2, resource: readyState.colorAccumView },
+      { binding: 3, resource: readyState.colorWeightView },
+      { binding: 4, resource: getActiveFieldView() },
     ],
   });
 
@@ -1251,9 +1257,9 @@ function renderGlowContours(encoder: GPUCommandEncoder, targetView: GPUTextureVi
   const glowSpread = Math.pow(spread, 0.7);
   const glowAlphaScale = 1 / Math.pow(thickness, 0.18);
   const offscreenMetrics = buildTargetMetrics(webGpuState.glowTargetWidth, webGpuState.glowTargetHeight);
-  const outerGlowColor = lerpColor(params.themePalette.outerColor, params.glowColor, clamp(0.72 + separation * 0.12, 0, 1));
-  const innerGlowColor = lerpColor(params.themePalette.baseColor, params.glowColor, clamp(0.9 + separation * 0.08, 0, 1));
-  const lineColor = lerpColor(params.themePalette.baseColor, params.glowColor, 1);
+  const outerGlowColor = lerpColor(params.themePalette.outerColor, params.glowColor, clamp(0.46 + separation * 0.14, 0.4, 0.7));
+  const innerGlowColor = lerpColor(params.themePalette.baseColor, params.glowColor, clamp(0.62 + separation * 0.12, 0.54, 0.82));
+  const lineColor = lerpColor(params.themePalette.lineColor, params.glowColor, clamp(0.54 + separation * 0.16, 0.48, 0.78));
   const outerCompositeOpacity = 0.60 * intensity;
   const innerCompositeOpacity = 0.54 * intensity;
   const outerLineWidth = (10 + alpha * 8) * (0.9 + thickness * 0.42);
@@ -1274,6 +1280,9 @@ function renderGlowContours(encoder: GPUCommandEncoder, targetView: GPUTextureVi
     0,
     outerAlpha,
     true,
+    0.9,
+    0.055,
+    0.3,
     "clear",
     readyState.lineUnionPipeline,
   );
@@ -1290,6 +1299,9 @@ function renderGlowContours(encoder: GPUCommandEncoder, targetView: GPUTextureVi
     0,
     innerAlpha,
     true,
+    0.98,
+    0.08,
+    0.5,
     "clear",
     readyState.lineUnionPipeline,
   );
@@ -1306,6 +1318,9 @@ function renderGlowContours(encoder: GPUCommandEncoder, targetView: GPUTextureVi
     0,
     (0.32 + alpha * 0.34) * 1.15,
     true,
+    1,
+    0.11,
+    0.72,
     "clear",
     readyState.lineUnionPipeline,
   );
@@ -1315,7 +1330,7 @@ function renderGlowContours(encoder: GPUCommandEncoder, targetView: GPUTextureVi
 function renderIsolineContours(encoder: GPUCommandEncoder, targetView: GPUTextureView, params: WebGpuRenderParams): void {
   const readyState = requireInitializedWebGpuState();
   const thresholdAlpha = Math.max(0.12, params.singleAmpGate);
-  const lineColor = params.themePalette.lineColor;
+  const lineColor = state.midBandColor;
   const offscreenMetrics = buildTargetMetrics(webGpuState.glowTargetWidth, webGpuState.glowTargetHeight);
   const lineWidth = 1.28 + thresholdAlpha * 0.98;
   const lineOpacity = 0.40 + thresholdAlpha * 0.52;
@@ -1330,6 +1345,9 @@ function renderIsolineContours(encoder: GPUCommandEncoder, targetView: GPUTextur
     0,
     lineOpacity,
     true,
+    0,
+    0,
+    0.58,
     "clear",
     readyState.lineUnionPipeline,
   );

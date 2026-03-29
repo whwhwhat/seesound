@@ -279,9 +279,9 @@ function drawGlowContours(
   const separation = numericControls.colorSeparation;
   const glowSpread = Math.pow(spread, 0.7);
   const glowAlphaScale = 1 / Math.pow(thickness, 0.18);
-  const outerGlowColor = lerpColor(themePalette.outerColor, glowColor, clamp(0.72 + separation * 0.12, 0, 1));
-  const innerGlowColor = lerpColor(themePalette.baseColor, glowColor, clamp(0.9 + separation * 0.08, 0, 1));
-  const lineColor = lerpColor(themePalette.baseColor, glowColor, 1);
+  const outerGlowColor = lerpColor(themePalette.outerColor, glowColor, clamp(0.46 + separation * 0.14, 0.4, 0.7));
+  const innerGlowColor = lerpColor(themePalette.baseColor, glowColor, clamp(0.62 + separation * 0.12, 0.54, 0.82));
+  const lineColor = lerpColor(themePalette.lineColor, glowColor, clamp(0.54 + separation * 0.16, 0.48, 0.78));
   glowCtx.setTransform(1, 0, 0, 1, 0, 0);
   glowCtx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
   glowCtx.save();

@@ -62,6 +62,15 @@ function renderField() {
     isPlaying,
   });
   const renderPlan = resolveRenderPlan(frameContext);
+  const useAnalyticCircleSingle = state.plateShape === "circle" && frameContext.displayMode === "single";
+  const effectiveRenderPlan = useAnalyticCircleSingle
+    ? {
+      backend: "legacy" as const,
+      capabilityKey: "legacy:cpu",
+      legacyPresenter: "cpu" as const,
+      shouldAttemptGpuField: false,
+    }
+    : renderPlan;
   const {
     prefersLegacyWebGlPresentation,
     spatialAtlas,
@@ -71,6 +80,7 @@ function renderField() {
   } = frameContext;
 
   const usedWebGpuMainPath =
+    !useAnalyticCircleSingle &&
     renderPlan.backend === "webgpu" &&
     renderSignedFieldWithWebGpu(
       spatialAtlas,
@@ -110,10 +120,10 @@ function renderField() {
     finishFrameProfile(frameProfile);
     return;
   }
-  setActiveRenderPath(renderPlan);
+  setActiveRenderPath(effectiveRenderPlan);
   clearWebGpuPresentation();
 
-  const legacyFieldState = accumulateLegacyField(frameContext, renderPlan, {
+  const legacyFieldState = accumulateLegacyField(frameContext, effectiveRenderPlan, {
     frameProfile,
     profileSectionEnd,
     profileSectionStart,

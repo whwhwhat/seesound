@@ -1,4 +1,5 @@
 import {
+  BESSEL_ZEROS,
   BASE_BG_COLOR,
   fieldSize,
 } from "../state/constants";
@@ -174,6 +175,41 @@ function buildIsolinePath(
   return path;
 }
 
+function buildCircleSingleModePath(inset: number, drawSize: number): Path2D {
+  const path = new Path2D();
+  const singleModeIndex = Math.max(0, Math.min(state.modeState.length - 1, Math.round(numericControls.singleModeIndex) - 1));
+  const mode = state.modeState[singleModeIndex];
+  if (!mode) {
+    return path;
+  }
+
+  const center = inset + drawSize * 0.5;
+  const outerRadius = drawSize * 0.5;
+  const rotation = (numericControls.angularRotation * Math.PI) / 180;
+
+  if (mode.n > 0) {
+    for (let index = 0; index < mode.n; index += 1) {
+      const angle = (rotation + Math.PI * 0.5 + index * Math.PI) / mode.n;
+      const dx = Math.cos(angle) * outerRadius;
+      const dy = Math.sin(angle) * outerRadius;
+      path.moveTo(center - dx, center - dy);
+      path.lineTo(center + dx, center + dy);
+    }
+  }
+
+  const zeros = BESSEL_ZEROS[mode.n];
+  const outerZero = zeros?.[mode.m - 1];
+  if (zeros && outerZero) {
+    for (let index = 0; index < mode.m - 1; index += 1) {
+      const ringRadius = outerRadius * (zeros[index] / outerZero);
+      path.moveTo(center + ringRadius, center);
+      path.arc(center, center, ringRadius, 0, Math.PI * 2);
+    }
+  }
+
+  return path;
+}
+
 function getIsolinePath(
   field: Float32Array,
   displayScale: number,
@@ -181,6 +217,23 @@ function getIsolinePath(
   drawSize: number,
   smoothed = false,
 ): Path2D {
+  if (state.plateShape === "circle" && state.displayMode === "single") {
+    const singleModeIndex = Math.max(0, Math.min(state.modeState.length - 1, Math.round(numericControls.singleModeIndex) - 1));
+    const mode = state.modeState[singleModeIndex];
+    const key = [
+      "analytic-circle-single",
+      inset.toFixed(3),
+      drawSize.toFixed(3),
+      mode?.m ?? 0,
+      mode?.n ?? 0,
+      numericControls.angularRotation.toFixed(2),
+    ].join(":");
+    if (contourPathCache.key !== key) {
+      contourPathCache.key = key;
+      contourPathCache.path = buildCircleSingleModePath(inset, drawSize);
+    }
+    return contourPathCache.path ?? new Path2D();
+  }
   const key = `${displayScale.toFixed(6)}:${inset.toFixed(3)}:${drawSize.toFixed(3)}:${smoothed ? 1 : 0}`;
   if (contourPathCache.key !== key) {
     contourPathCache.key = key;

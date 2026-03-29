@@ -171,11 +171,12 @@ function compositeLegacyScene(
   const compositeStart = frameProfileTools.profileSectionStart(frameProfileTools.frameProfile);
   const inset = canvas.width * 0.09;
   const drawSize = canvas.width - inset * 2;
+  const useAnalyticCircleSingle = state.plateShape === "circle" && state.displayMode === "single";
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (!useDirectGpuPresentation) {
     ctx.fillStyle = toRgba(BASE_BG_COLOR, 1);
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-  } else if (state.renderStyle === "glow") {
+  } else if (state.renderStyle === "glow" && !useAnalyticCircleSingle) {
     ctx.save();
     ctx.fillStyle = toRgba(BASE_BG_COLOR, 0.94);
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -208,20 +209,22 @@ function compositeLegacyScene(
   }
 
   if (!useDirectGpuPresentation && state.renderStyle === "glow" && smoothedIsolinePath) {
-    ctx.save();
-    if (state.plateShape === "circle") {
-      ctx.beginPath();
-      ctx.arc(canvas.width / 2, canvas.height / 2, drawSize / 2, 0, Math.PI * 2);
-      ctx.clip();
+    if (!useAnalyticCircleSingle) {
+      ctx.save();
+      if (state.plateShape === "circle") {
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, canvas.height / 2, drawSize / 2, 0, Math.PI * 2);
+        ctx.clip();
+      }
+      ctx.shadowColor = toRgba(themePalette.outerColor, 0.08);
+      ctx.shadowBlur = 10;
+      ctx.imageSmoothingEnabled = true;
+      const glowBlur = 0.45 + singleModeBlur * 0.6;
+      ctx.filter = `blur(${glowBlur.toFixed(2)}px)`;
+      ctx.globalAlpha = 0.18;
+      ctx.drawImage(fieldCanvas, inset, inset, drawSize, drawSize);
+      ctx.restore();
     }
-    ctx.shadowColor = toRgba(themePalette.outerColor, 0.08);
-    ctx.shadowBlur = 10;
-    ctx.imageSmoothingEnabled = true;
-    const glowBlur = 0.45 + singleModeBlur * 0.6;
-    ctx.filter = `blur(${glowBlur.toFixed(2)}px)`;
-    ctx.globalAlpha = 0.18;
-    ctx.drawImage(fieldCanvas, inset, inset, drawSize, drawSize);
-    ctx.restore();
     const glowContourStart = frameProfileTools.profileSectionStart(frameProfileTools.frameProfile);
     drawGlowContours(smoothedIsolinePath, drawSize, singleAmpGate, glowColor, themePalette);
     frameProfileTools.profileSectionEnd(frameProfileTools.frameProfile, "glowContours", glowContourStart);

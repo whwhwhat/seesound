@@ -89,16 +89,20 @@ fn crystalField(pos : vec2f) -> f32 {
   let orientationDrift = centerAngle * harmonicTilt * (0.1 + coherence * 0.08);
   let latticeAngle = centerAngle * harmonicTilt * (0.14 + coherence * 0.1);
   let rotated = rotate2(pos, orientationDrift);
-  let drift = params.crystal.y * 0.75 + params.dynamics.x * 0.2;
+  let drift = params.crystal.y * 0.75;
   let latticeScale = 9.5 + params.crystal.z * 2.6;
   let tonalBias = params.crystal.x;
   let latticeVec = triLattice(rotated, latticeAngle, latticeScale);
+  let facetCoords = rotate2(
+    rotated + vec2f(0.18, -0.14) * harmonicTilt + vec2f(-0.12, 0.09) * coherence,
+    latticeAngle * 0.6,
+  );
   let lattice = (
     cos(acos(latticeVec.x) + time * (0.08 + params.crystal.y * 0.14) + drift) +
-    cos(acos(latticeVec.y) - time * (0.06 + params.crystal.y * 0.1) + params.dynamics.y * 1.8 * tonalBias) +
-    cos(acos(latticeVec.z) + time * (0.05 + params.crystal.y * 0.08) - params.dynamics.z * 1.5 * tonalBias)
+    cos(acos(latticeVec.y) - time * (0.06 + params.crystal.y * 0.1) + tonalBias * 0.12) +
+    cos(acos(latticeVec.z) + time * (0.05 + params.crystal.y * 0.08) - tonalBias * 0.1)
   ) / 3.0;
-  let facet = 1.0 - smoothstep(0.18, 0.72, fract(hexFacet(rotated * (2.2 + harmonicTilt * 0.9))) );
+  let facet = 1.0 - smoothstep(0.2, 0.78, fract(hexFacet(facetCoords * (2.6 + harmonicTilt * 1.1))) );
   let ridgeCarrier = triLattice(rotated * (1.0 + harmonicTilt * 0.1), latticeAngle, latticeScale * (0.82 + coherence * 0.12));
   let ridgeSeed = max(max(abs(ridgeCarrier.x), abs(ridgeCarrier.y)), abs(ridgeCarrier.z));
   let ridge = 1.0 - smoothstep(0.84 - coherence * 0.06, 0.98, ridgeSeed);
@@ -108,13 +112,13 @@ fn crystalField(pos : vec2f) -> f32 {
     lattice
   );
   let pitchLift = pitchProfile(rotated);
-  let centerLift = exp(-dot(rotated, rotated) * mix(2.0, 3.7, params.crystal.z * 0.62 + coherence * 0.2))
-    * (0.18 + params.dynamics.y * 0.16 + params.crystal.w * 0.08 + coherence * 0.12);
+  let centerLift = exp(-dot(rotated, rotated) * mix(3.2, 5.0, params.crystal.z * 0.62 + coherence * 0.2))
+    * (0.035 + params.crystal.w * 0.015 + coherence * 0.02);
   let ribbon = sin((rotated.x - rotated.y) * (4.3 + params.crystal.y * 1.5 + harmonicTilt * 0.8) - time * (0.06 + params.crystal.y * 0.08)) * 0.5 + 0.5;
   return membrane * (0.64 + params.crystal.z * 0.12 + coherence * 0.14)
-    + pitchLift * (0.38 + tonalBias * 0.2 + harmonicTilt * 0.14)
-    + centerLift * 0.34
-    + ribbon * params.dynamics.z * 0.05
+    + pitchLift * (0.28 + tonalBias * 0.14 + harmonicTilt * 0.08)
+    + centerLift * 0.045
+    + ribbon * 0.018
     + facet * 0.08 * (0.4 + coherence * 0.6)
     + ridge * (0.06 + coherence * 0.08);
 }
@@ -155,6 +159,13 @@ fn fsMain(@location(0) uv : vec2f) -> @location(0) vec4f {
   let orientationDrift = centerAngle * harmonicTilt * (0.1 + coherence * 0.08);
   let latticeAngle = centerAngle * harmonicTilt * (0.14 + coherence * 0.1);
   let rotated = rotate2(pos, orientationDrift);
+  let rmsPulse = smoothstep(0.08, 0.34, params.canvas.w);
+  let bandPulse = smoothstep(0.12, 0.42, max(params.dynamics.y, params.dynamics.z));
+  let structuralPulse = max(rmsPulse, bandPulse);
+  let facetCoords = rotate2(
+    rotated + vec2f(0.18, -0.14) * harmonicTilt + vec2f(-0.12, 0.09) * coherence,
+    latticeAngle * 0.6,
+  );
   let flowVec = prismaticFlow(
     rotated * (1.0 + harmonicTilt * 0.08),
     latticeAngle,
@@ -165,25 +176,28 @@ fn fsMain(@location(0) uv : vec2f) -> @location(0) vec4f {
   let rimDir = normalize(vec3f(0.46, -0.18, 0.72));
   let diffuse = saturate(dot(normal, lightDir));
   let rim = pow(1.0 - saturate(dot(normal, rimDir)), 2.4);
-  let facetMeasure = hexFacet(rotated * (2.2 + harmonicTilt * 0.8));
-  let facetBand = 1.0 - smoothstep(0.08, 0.22 + (1.0 - coherence) * 0.06, abs(fract(facetMeasure) - 0.5));
-  let seam = pow(facetBand, 1.8) * (0.12 + coherence * 0.18);
+  let facetMeasure = hexFacet(facetCoords * (2.6 + harmonicTilt * 1.0));
+  let facetBand = 1.0 - smoothstep(0.1, 0.26 + (1.0 - coherence) * 0.06, abs(fract(facetMeasure) - 0.5));
   let flowBand = max(max(flowVec.x, flowVec.y), flowVec.z);
-  let internalFlow = smoothstep(0.24, 0.96, flowBand) * (0.2 + params.crystal.y * 0.34 + harmonicTilt * 0.12);
-  let internalCore = exp(-dot(rotated, rotated) * (2.4 - coherence * 0.5)) * (0.18 + params.crystal.w * 0.18);
+  let linkTexture = saturate(facetBand * 0.58 + smoothstep(0.4, 0.94, flowBand) * 0.42);
+  let linkPulse = structuralPulse * linkTexture;
+  let seam = pow(facetBand, 1.8) * (0.09 + coherence * 0.12 + linkPulse * 0.1);
+  let internalFlow = smoothstep(0.32, 0.98, flowBand) * (0.075 + params.crystal.y * 0.08 + harmonicTilt * 0.03 + linkPulse * 0.03);
+  let internalCore = exp(-dot(rotated, rotated) * (3.8 - coherence * 0.24)) * (0.03 + params.crystal.w * 0.025);
 
-  let lowMid = mix(params.lowColor.rgb, params.midColor.rgb, saturate(params.dynamics.y * 1.02 + field * (0.2 + params.crystal.x * 0.14)));
-  let palette = mix(lowMid, params.highColor.rgb, saturate(params.dynamics.z * 0.76 + field * 0.14 + harmonicTilt * 0.12));
-  let shadow = mix(vec3f(4.0, 8.0, 12.0), palette * 0.24, 0.62);
-  let body = mix(shadow, palette, saturate(field * (0.68 + params.crystal.z * 0.16 + coherence * 0.14) + diffuse * 0.42));
-  let crest = palette * (0.72 + params.crystal.w * 0.24 + coherence * 0.1) + params.highColor.rgb * rim * (0.08 + params.crystal.w * 0.1);
+  let lowMid = mix(params.lowColor.rgb, params.midColor.rgb, saturate(field * (0.24 + params.crystal.x * 0.14) + harmonicTilt * 0.08));
+  let palette = mix(lowMid, params.highColor.rgb, saturate(field * 0.16 + harmonicTilt * 0.14 + coherence * 0.04));
+  let shadow = mix(vec3f(4.0, 8.0, 12.0), palette * 0.22, 0.58);
+  let body = mix(shadow, palette, saturate(field * (0.6 + params.crystal.z * 0.12 + coherence * 0.1) + diffuse * 0.38));
+  let crest = palette * (0.6 + params.crystal.w * 0.14 + coherence * 0.06) + params.highColor.rgb * rim * (0.04 + params.crystal.w * 0.045);
   var color = mix(body, crest, saturate(diffuse * 0.52 + rim * 0.42 + coherence * 0.08));
-  let sheen = pow(saturate(diffuse), 5.0) * (0.14 + params.crystal.w * 0.28 + params.dynamics.y * 0.12 + coherence * 0.16);
-  color += params.highColor.rgb * sheen * (0.32 + params.crystal.w * 0.24 + harmonicTilt * 0.12);
-  color += params.highColor.rgb * seam * (0.22 + params.crystal.w * 0.16);
+  let sheen = pow(saturate(diffuse), 5.8) * (0.045 + params.crystal.w * 0.07 + coherence * 0.06);
+  color += params.highColor.rgb * sheen * (0.1 + params.crystal.w * 0.06 + harmonicTilt * 0.05);
+  color += params.highColor.rgb * seam * (0.1 + params.crystal.w * 0.07);
   color = mix(color, color * (0.94 + coherence * 0.03), facetBand * 0.16);
-  color += mix(params.midColor.rgb, params.highColor.rgb, 0.58 + harmonicTilt * 0.18) * internalFlow * (0.12 + params.crystal.w * 0.18);
-  color += params.highColor.rgb * internalCore * internalFlow * (0.18 + params.crystal.w * 0.22);
+  color += mix(params.midColor.rgb, params.highColor.rgb, 0.5 + harmonicTilt * 0.08) * internalFlow * (0.022 + params.crystal.w * 0.024);
+  color += params.highColor.rgb * internalCore * internalFlow * (0.014 + params.crystal.w * 0.014);
+  color = mix(color, color + params.highColor.rgb * 0.012, linkPulse * 0.6);
 
   let grain = sin((pos.x + pos.y) * 19.0 + params.canvas.z * 0.05) * 0.5 + 0.5;
   color = mix(color, color + palette * 0.04, grain * 0.06 * params.dynamics.z * (0.6 + params.crystal.y * 0.4));

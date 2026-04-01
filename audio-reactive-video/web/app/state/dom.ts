@@ -47,6 +47,7 @@ const audioVolumeWrap = requireElement<HTMLElement>("audioVolumeWrap");
 const audioVolumeToggleButton = requireElement<HTMLButtonElement>("audioVolumeToggle");
 const audioVolumeInput = requireElement<HTMLInputElement>("audioVolume");
 const fileInput = requireElement<HTMLInputElement>("audioFile");
+const audioCaptureToggleButton = requireElement<HTMLButtonElement>("audioCaptureToggle");
 const panelCollapseHandle = requireElement<HTMLButtonElement>("panelCollapseHandle");
 const panelExpandHandle = requireElement<HTMLButtonElement>("panelExpandHandle");
 const currentTrackNode = requireElement<HTMLParagraphElement>("currentTrack");
@@ -189,6 +190,7 @@ export {
   audioSeekInput,
   audioTimeNode,
   audioVolumeInput,
+  audioCaptureToggleButton,
   audioVolumeToggleButton,
   audioVolumeWrap,
   bandLabel,

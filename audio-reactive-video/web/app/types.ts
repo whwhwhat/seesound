@@ -37,6 +37,7 @@ export type ThemeKey =
 export type ActiveTheme = ThemeKey | "custom";
 export type ActiveRenderer = "legacy" | "webgpu";
 export type ActivePresentation = "cpu" | "webgl" | "native";
+export type AudioInputSource = "file" | "capture";
 
 export interface ModeState {
   m: number;
@@ -92,7 +93,11 @@ export interface SpatialAtlasCache {
 export interface AppState {
   audioContext: AudioContext | null;
   analyser: AnalyserNode | null;
-  sourceNode: MediaElementAudioSourceNode | null;
+  audioElementSourceNode: MediaElementAudioSourceNode | null;
+  captureSourceNode: MediaStreamAudioSourceNode | null;
+  activeAudioSource: AudioInputSource | null;
+  captureStream: MediaStream | null;
+  isAudioInputActive: boolean;
   freqData: Uint8Array | null;
   timeData: Uint8Array | null;
   modeState: ModeState[];

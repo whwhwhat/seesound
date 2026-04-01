@@ -21,12 +21,12 @@ function getDefaultTrackLabel(): string {
 
 function getIdleStatusText(): string {
   if (state.visualMode === "crystal") {
-    return "Load audio to excite the crystal membrane.";
+    return "Load audio or capture a browser tab to excite the crystal membrane.";
   }
   if (state.visualMode === "lattice") {
-    return "Load audio to energize the lattice projection.";
+    return "Load audio or capture a browser tab to energize the lattice projection.";
   }
-  return "Load audio to start the analyser.";
+  return "Load audio or capture a browser tab to start the analyser.";
 }
 
 function getLoadedStatusText(fileName: string): string {
@@ -97,7 +97,7 @@ function applyModeCopy(): void {
     playbackKicker.textContent = "Start with a track, then shape the field in real time.";
   }
 
-  if (!state.currentAudioFileName) {
+  if (!state.currentAudioFileName && state.activeAudioSource !== "capture") {
     currentTrackNode.textContent = getDefaultTrackLabel();
     statusNode.textContent = getIdleStatusText();
   }

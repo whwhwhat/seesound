@@ -76,7 +76,11 @@ const profiler: ProfilerState = {
 const state: AppState = {
   audioContext: null,
   analyser: null,
-  sourceNode: null,
+  audioElementSourceNode: null,
+  captureSourceNode: null,
+  activeAudioSource: null,
+  captureStream: null,
+  isAudioInputActive: false,
   freqData: null,
   timeData: null,
   modeState: [],

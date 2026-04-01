@@ -74,6 +74,7 @@ import {
   getBandRanges,
 } from "./geometry";
 import type {
+  AudioInputSource,
   AudioFrame,
   BandRange,
   FrameProfile,
@@ -437,11 +438,59 @@ function ensureAudioGraph(): void {
   state.analyser.smoothingTimeConstant = 0.78;
   state.freqData = new Uint8Array(state.analyser.frequencyBinCount);
   state.timeData = new Uint8Array(state.analyser.fftSize);
-
-  state.sourceNode = state.audioContext.createMediaElementSource(audio);
-  state.sourceNode.connect(state.analyser);
-  state.analyser.connect(state.audioContext.destination);
   updateModeLabel();
+}
+
+function disconnectAudioInputs(): void {
+  state.audioElementSourceNode?.disconnect();
+  state.captureSourceNode?.disconnect();
+}
+
+function setActiveAudioInput(source: AudioInputSource | null): void {
+  state.activeAudioSource = source;
+  state.isAudioInputActive = source === "capture"
+    ? Boolean(state.captureStream?.active)
+    : source === "file"
+      ? !audio.paused && !audio.ended && audio.currentTime > 0
+      : false;
+}
+
+function connectAudioElementSource(): void {
+  ensureAudioGraph();
+  if (!state.audioContext || !state.analyser) {
+    return;
+  }
+  if (!state.audioElementSourceNode) {
+    state.audioElementSourceNode = state.audioContext.createMediaElementSource(audio);
+  }
+  disconnectAudioInputs();
+  state.audioElementSourceNode.connect(state.analyser);
+  state.audioElementSourceNode.connect(state.audioContext.destination);
+  setActiveAudioInput("file");
+}
+
+function connectCaptureStream(stream: MediaStream): void {
+  ensureAudioGraph();
+  if (!state.audioContext || !state.analyser) {
+    return;
+  }
+  disconnectAudioInputs();
+  state.captureSourceNode = state.audioContext.createMediaStreamSource(stream);
+  state.captureSourceNode.connect(state.analyser);
+  state.captureStream = stream;
+  setActiveAudioInput("capture");
+}
+
+function stopCaptureStream(): void {
+  state.captureSourceNode?.disconnect();
+  state.captureSourceNode = null;
+  state.captureStream?.getTracks().forEach((track) => {
+    track.stop();
+  });
+  state.captureStream = null;
+  if (state.activeAudioSource === "capture") {
+    setActiveAudioInput(null);
+  }
 }
 
 function buildModeRenderState(
@@ -526,7 +575,13 @@ function updateModeState(): AudioFrame {
     updateModeLabel();
   }
 
-  const isPlaying = Boolean(state.analyser) && !audio.paused && !audio.ended && audio.currentTime > 0;
+  const isPlaying = Boolean(state.analyser) && (
+    state.activeAudioSource === "capture"
+      ? state.isAudioInputActive
+      : state.activeAudioSource === "file"
+        ? !audio.paused && !audio.ended && audio.currentTime > 0
+        : false
+  );
   if (!state.analyser || !isPlaying) {
     return { bands: ensureInactiveBands(targetCount), rms: 0, centroid: 0, isPlaying: false };
   }
@@ -575,9 +630,13 @@ export {
   beginFrameProfile,
   buildModeRenderState,
   buildModes,
+  connectAudioElementSource,
+  connectCaptureStream,
   ensureAudioGraph,
   finishFrameProfile,
   getThemeGlowPalette,
+  setActiveAudioInput,
+  stopCaptureStream,
   getThemeLineColor,
   profileSectionEnd,
   profileSectionStart,

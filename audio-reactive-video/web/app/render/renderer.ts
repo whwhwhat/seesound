@@ -47,6 +47,9 @@ import {
 import {
   renderCrystalScene,
 } from "./crystal-webgpu";
+import {
+  renderLatticeScene,
+} from "./lattice-webgpu";
 
 const FRAME_LIMIT_TOLERANCE_MS = 1.25;
 
@@ -61,6 +64,24 @@ function renderField() {
   if (state.visualMode === "crystal") {
     clearGpuPresentation();
     const rendered = renderCrystalScene({
+      bands,
+      rms,
+      centroid,
+      isPlaying,
+    });
+    if (!rendered) {
+      clearWebGpuPresentation();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    } else {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    finishFrameProfile(frameProfile);
+    return;
+  }
+
+  if (state.visualMode === "lattice") {
+    clearGpuPresentation();
+    const rendered = renderLatticeScene({
       bands,
       rms,
       centroid,

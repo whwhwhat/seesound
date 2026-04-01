@@ -10,45 +10,73 @@ import {
 } from "../state/runtime-state";
 
 function getDefaultTrackLabel(): string {
-  return state.visualMode === "crystal"
-    ? "No source feeding the harmonic membrane"
-    : "No track loaded";
+  if (state.visualMode === "crystal") {
+    return "No source feeding the harmonic membrane";
+  }
+  if (state.visualMode === "lattice") {
+    return "No source driving the spatial lattice";
+  }
+  return "No track loaded";
 }
 
 function getIdleStatusText(): string {
-  return state.visualMode === "crystal"
-    ? "Load audio to excite the crystal membrane."
-    : "Load audio to start the analyser.";
+  if (state.visualMode === "crystal") {
+    return "Load audio to excite the crystal membrane.";
+  }
+  if (state.visualMode === "lattice") {
+    return "Load audio to energize the lattice projection.";
+  }
+  return "Load audio to start the analyser.";
 }
 
 function getLoadedStatusText(fileName: string): string {
-  return state.visualMode === "crystal"
-    ? `Loaded ${fileName}. Press play to wake the crystal membrane.`
-    : `Loaded ${fileName}. Press play to drive the field.`;
+  if (state.visualMode === "crystal") {
+    return `Loaded ${fileName}. Press play to wake the crystal membrane.`;
+  }
+  if (state.visualMode === "lattice") {
+    return `Loaded ${fileName}. Press play to fold the lattice in motion.`;
+  }
+  return `Loaded ${fileName}. Press play to drive the field.`;
 }
 
 function getRunningStatusText(): string {
-  return state.visualMode === "crystal"
-    ? "Crystal membrane is resolving harmonic flow in realtime."
-    : "Running realtime resonance preview.";
+  if (state.visualMode === "crystal") {
+    return "Crystal membrane is resolving harmonic flow in realtime.";
+  }
+  if (state.visualMode === "lattice") {
+    return "Lattice projection is folding and pulsing in realtime.";
+  }
+  return "Running realtime resonance preview.";
 }
 
 function getPausedStatusText(): string {
-  return state.visualMode === "crystal"
-    ? "Playback paused. Crystal structure is held at the current harmonic state."
-    : "Playback paused. Field is frozen at the current state.";
+  if (state.visualMode === "crystal") {
+    return "Playback paused. Crystal structure is held at the current harmonic state.";
+  }
+  if (state.visualMode === "lattice") {
+    return "Playback paused. Lattice structure is held at the current folded state.";
+  }
+  return "Playback paused. Field is frozen at the current state.";
 }
 
 function getEndedStatusText(): string {
-  return state.visualMode === "crystal"
-    ? "Playback ended. Crystal structure is held at the terminal harmonic state."
-    : "Playback ended. Field is frozen at the final state.";
+  if (state.visualMode === "crystal") {
+    return "Playback ended. Crystal structure is held at the terminal harmonic state.";
+  }
+  if (state.visualMode === "lattice") {
+    return "Playback ended. Lattice structure is held at the final folded state.";
+  }
+  return "Playback ended. Field is frozen at the final state.";
 }
 
 function getPlayErrorStatusText(): string {
-  return state.visualMode === "crystal"
-    ? "Unable to start playback. Try loading the source again to re-seed the crystal renderer."
-    : "Unable to start playback. Try loading the track again.";
+  if (state.visualMode === "crystal") {
+    return "Unable to start playback. Try loading the source again to re-seed the crystal renderer.";
+  }
+  if (state.visualMode === "lattice") {
+    return "Unable to start playback. Try loading the source again to re-seed the lattice renderer.";
+  }
+  return "Unable to start playback. Try loading the track again.";
 }
 
 function applyModeCopy(): void {
@@ -57,6 +85,11 @@ function applyModeCopy(): void {
     heroLede.textContent =
       "This mode treats harmony like internal stress across a luminous crystal skin, letting tonal centers bend, polish, and illuminate a continuous surface.";
     playbackKicker.textContent = "Feed it music with strong pitch content, then watch the membrane settle, tense, and flow.";
+  } else if (state.visualMode === "lattice") {
+    heroTitle.textContent = "Fold sound through a projected spatial lattice.";
+    heroLede.textContent =
+      "This mode treats the mix like a moving wireframe volume, letting rhythm, density, and brightness bend a tesseract-like scaffold in realtime.";
+    playbackKicker.textContent = "Use it to judge whether the structural, hypercube-inspired direction feels promising.";
   } else {
     heroTitle.textContent = "Shape sound into a living resonance field.";
     heroLede.textContent =

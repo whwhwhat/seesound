@@ -32,6 +32,12 @@ import {
   highColorWrap,
   lowColorInput,
   lowColorWrap,
+  latticePerspectiveWrap,
+  latticeRotationSpeedWrap,
+  latticeTranslateWWrap,
+  latticeTranslateXWrap,
+  latticeTranslateYWrap,
+  latticeTranslateZWrap,
   midColorInput,
   midColorWrap,
   modeLabel,
@@ -44,6 +50,7 @@ import {
   singleModeWrap,
   themeSelect,
   themeWrap,
+  latticeModeNote,
 } from "../state/dom";
 import {
   profiler,
@@ -303,38 +310,47 @@ function updateModeLabel() {
 
 function syncControlVisibility() {
   const isCrystal = state.visualMode === "crystal";
+  const isLattice = state.visualMode === "lattice";
+  const usesDedicatedRenderer = isCrystal || isLattice;
   const isGlow = state.renderStyle === "glow";
   const isSingle = state.displayMode === "single";
   const isCircle = state.plateShape === "circle";
   crystalModeNote.classList.toggle("is-hidden", !isCrystal);
+  latticeModeNote.classList.toggle("is-hidden", !isLattice);
+  latticePerspectiveWrap.classList.toggle("is-hidden", !isLattice);
+  latticeRotationSpeedWrap.classList.toggle("is-hidden", !isLattice);
+  latticeTranslateXWrap.classList.toggle("is-hidden", !isLattice);
+  latticeTranslateYWrap.classList.toggle("is-hidden", !isLattice);
+  latticeTranslateZWrap.classList.toggle("is-hidden", !isLattice);
+  latticeTranslateWWrap.classList.toggle("is-hidden", !isLattice);
   crystalMaterialBlock.classList.toggle("is-hidden", !isCrystal);
   crystalPaletteBlock.classList.toggle("is-hidden", !isCrystal);
   crystalTonalFocusWrap.classList.toggle("is-hidden", !isCrystal);
   crystalFlowWrap.classList.toggle("is-hidden", !isCrystal);
   crystalTensionWrap.classList.toggle("is-hidden", !isCrystal);
   crystalBloomWrap.classList.toggle("is-hidden", !isCrystal);
-  plateShapeBlock.classList.toggle("is-hidden", isCrystal);
-  renderStyleBlock.classList.toggle("is-hidden", isCrystal);
-  fieldBehaviorSection.classList.toggle("is-hidden", isCrystal);
-  advancedPanel.classList.toggle("is-hidden", isCrystal);
+  plateShapeBlock.classList.toggle("is-hidden", usesDedicatedRenderer);
+  renderStyleBlock.classList.toggle("is-hidden", usesDedicatedRenderer);
+  fieldBehaviorSection.classList.toggle("is-hidden", usesDedicatedRenderer);
+  advancedPanel.classList.toggle("is-hidden", usesDedicatedRenderer);
   angularRotationWrap.classList.toggle("is-hidden", !isCircle);
-  atmosphereWrap.classList.toggle("is-hidden", isCrystal);
-  glowThicknessWrap.classList.toggle("is-hidden", isCrystal || !isGlow);
-  glowSpreadWrap.classList.toggle("is-hidden", isCrystal || !isGlow);
-  glowIntensityWrap.classList.toggle("is-hidden", isCrystal || !isGlow);
+  atmosphereWrap.classList.toggle("is-hidden", usesDedicatedRenderer);
+  glowThicknessWrap.classList.toggle("is-hidden", usesDedicatedRenderer || !isGlow);
+  glowSpreadWrap.classList.toggle("is-hidden", usesDedicatedRenderer || !isGlow);
+  glowIntensityWrap.classList.toggle("is-hidden", usesDedicatedRenderer || !isGlow);
   colorSeparationWrap.classList.add("is-hidden");
   adaptiveColorMixWrap.classList.add("is-hidden");
-  themeWrap.classList.toggle("is-hidden", isCrystal);
-  lowColorWrap.classList.toggle("is-hidden", isCrystal);
-  midColorWrap.classList.toggle("is-hidden", isCrystal);
-  highColorWrap.classList.toggle("is-hidden", isCrystal);
+  themeWrap.classList.toggle("is-hidden", usesDedicatedRenderer);
+  lowColorWrap.classList.toggle("is-hidden", usesDedicatedRenderer);
+  midColorWrap.classList.toggle("is-hidden", usesDedicatedRenderer);
+  highColorWrap.classList.toggle("is-hidden", usesDedicatedRenderer);
   nodalFocusWrap.classList.toggle("is-hidden", true);
   contrastWrap.classList.toggle("is-hidden", true);
-  combineModeWrap.classList.toggle("is-hidden", isCrystal || isSingle);
-  singleModeWrap.classList.toggle("is-hidden", isCrystal || !isSingle);
-  modeLabel.classList.toggle("is-hidden", isCrystal || !isSingle);
-  bandLabel.classList.toggle("is-hidden", isCrystal || !isSingle);
-  singleModeViewWrap.classList.toggle("is-hidden", isCrystal || !isSingle);
+  combineModeWrap.classList.toggle("is-hidden", usesDedicatedRenderer || isSingle);
+  singleModeWrap.classList.toggle("is-hidden", usesDedicatedRenderer || !isSingle);
+  modeLabel.classList.toggle("is-hidden", usesDedicatedRenderer || !isSingle);
+  bandLabel.classList.toggle("is-hidden", usesDedicatedRenderer || !isSingle);
+  singleModeViewWrap.classList.toggle("is-hidden", usesDedicatedRenderer || !isSingle);
 }
 
 function syncThemeInputs() {

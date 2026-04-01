@@ -56,6 +56,24 @@ const playbackKicker = requireElement<HTMLParagraphElement>("playbackKicker");
 const statusNode = requireElement<HTMLParagraphElement>("status");
 const visualModeButtons = getSegmentedButtons("visualMode", "button[data-visual-mode]");
 const crystalModeNote = requireElement<HTMLParagraphElement>("crystalModeNote");
+const latticeModeNote = requireElement<HTMLParagraphElement>("latticeModeNote");
+const latticePerspectiveWrap = requireElement<HTMLLabelElement>("latticePerspectiveWrap");
+const latticePerspectiveEnabledInput = requireElement<HTMLInputElement>("latticePerspectiveEnabled");
+const latticeRotationSpeedWrap = requireElement<HTMLLabelElement>("latticeRotationSpeedWrap");
+const latticeRotationSpeedInput = requireElement<HTMLInputElement>("latticeRotationSpeed");
+const latticeRotationSpeedOutput = requireOutput("latticeRotationSpeed");
+const latticeTranslateXWrap = requireElement<HTMLLabelElement>("latticeTranslateXWrap");
+const latticeTranslateYWrap = requireElement<HTMLLabelElement>("latticeTranslateYWrap");
+const latticeTranslateZWrap = requireElement<HTMLLabelElement>("latticeTranslateZWrap");
+const latticeTranslateWWrap = requireElement<HTMLLabelElement>("latticeTranslateWWrap");
+const latticeTranslateXInput = requireElement<HTMLInputElement>("latticeTranslateX");
+const latticeTranslateYInput = requireElement<HTMLInputElement>("latticeTranslateY");
+const latticeTranslateZInput = requireElement<HTMLInputElement>("latticeTranslateZ");
+const latticeTranslateWInput = requireElement<HTMLInputElement>("latticeTranslateW");
+const latticeTranslateXOutput = requireOutput("latticeTranslateX");
+const latticeTranslateYOutput = requireOutput("latticeTranslateY");
+const latticeTranslateZOutput = requireOutput("latticeTranslateZ");
+const latticeTranslateWOutput = requireOutput("latticeTranslateW");
 const crystalMaterialBlock = requireElement<HTMLElement>("crystalMaterialBlock");
 const crystalMaterialButtons = getSegmentedButtons("crystalMaterial", "button[data-crystal-material]");
 const crystalPaletteBlock = requireElement<HTMLElement>("crystalPaletteBlock");
@@ -196,6 +214,24 @@ export {
   currentTrackNode,
   crystalMaterialBlock,
   crystalMaterialButtons,
+  latticeModeNote,
+  latticePerspectiveEnabledInput,
+  latticePerspectiveWrap,
+  latticeRotationSpeedInput,
+  latticeRotationSpeedOutput,
+  latticeRotationSpeedWrap,
+  latticeTranslateWInput,
+  latticeTranslateWOutput,
+  latticeTranslateWWrap,
+  latticeTranslateXInput,
+  latticeTranslateXOutput,
+  latticeTranslateXWrap,
+  latticeTranslateYInput,
+  latticeTranslateYOutput,
+  latticeTranslateYWrap,
+  latticeTranslateZInput,
+  latticeTranslateZOutput,
+  latticeTranslateZWrap,
   crystalPaletteBlock,
   crystalPaletteButtons,
   ctx,

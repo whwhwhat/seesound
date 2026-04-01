@@ -31,6 +31,9 @@ import {
   primeCrystalRenderer,
 } from "./render/crystal-webgpu";
 import {
+  primeLatticeRenderer,
+} from "./render/lattice-webgpu";
+import {
   requestRender,
 } from "./render/renderer";
 
@@ -46,6 +49,7 @@ bindColorPicker();
 bindEventHandlers();
 window.dispatchEvent(new Event("resize"));
 void primeCrystalRenderer();
+void primeLatticeRenderer();
 primeWebGpuRenderer().then((ready) => {
   if (ready) {
     requestRender();

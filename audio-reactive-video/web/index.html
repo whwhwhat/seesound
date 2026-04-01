@@ -75,8 +75,9 @@
                 <div class="segmented-control" id="visualMode">
                   <button type="button" data-visual-mode="spectral" class="is-active">Spectral</button>
                   <button type="button" data-visual-mode="crystal">Crystal</button>
+                  <button type="button" data-visual-mode="lattice">Lattice</button>
                 </div>
-                <small class="control-help">Spectral keeps the current resonance field. Crystal switches to a separate harmonic membrane renderer.</small>
+                <small class="control-help">Spectral keeps the resonance field. Crystal becomes a harmonic membrane. Lattice becomes a projected spatial wireframe.</small>
               </div>
               <div id="themeWrap" class="custom-select">
                 <span>Theme</span>
@@ -155,6 +156,42 @@
                 <small class="control-help">Glow emphasizes atmosphere. Isoline reveals the nodal skeleton.</small>
               </div>
               <p id="crystalModeNote" class="mode-label is-hidden">Crystal mode runs on a separate harmonic membrane renderer with its own motion language.</p>
+              <p id="latticeModeNote" class="mode-label is-hidden">Lattice mode is an MVP spatial renderer focused on hypercube-like wireframe motion.</p>
+              <label id="latticePerspectiveWrap" class="control-toggle is-hidden">
+                <span>Perspective projection</span>
+                <input id="latticePerspectiveEnabled" type="checkbox" checked />
+                <small class="control-help">Toggle between perspective depth and a flatter, more diagram-like projection.</small>
+              </label>
+              <label id="latticeRotationSpeedWrap" class="is-hidden">
+                <span>W rotation speed</span>
+                <input id="latticeRotationSpeed" type="range" min="0.00" max="1.50" step="0.01" value="0.42" />
+                <output for="latticeRotationSpeed">0.42</output>
+                <small class="control-help">Controls how fast the tesseract turns through the hidden w dimension over time.</small>
+              </label>
+              <label id="latticeTranslateXWrap" class="is-hidden">
+                <span>X translation</span>
+                <input id="latticeTranslateX" type="range" min="-2.00" max="2.00" step="0.01" value="0.00" />
+                <output for="latticeTranslateX">0.00</output>
+                <small class="control-help">Moves the tesseract along the x axis before projection.</small>
+              </label>
+              <label id="latticeTranslateYWrap" class="is-hidden">
+                <span>Y translation</span>
+                <input id="latticeTranslateY" type="range" min="-2.00" max="2.00" step="0.01" value="0.00" />
+                <output for="latticeTranslateY">0.00</output>
+                <small class="control-help">Moves the tesseract along the y axis before projection.</small>
+              </label>
+              <label id="latticeTranslateZWrap" class="is-hidden">
+                <span>Z translation</span>
+                <input id="latticeTranslateZ" type="range" min="-2.00" max="2.00" step="0.01" value="0.00" />
+                <output for="latticeTranslateZ">0.00</output>
+                <small class="control-help">Moves the tesseract along the z axis before screen projection.</small>
+              </label>
+              <label id="latticeTranslateWWrap" class="is-hidden">
+                <span>W translation</span>
+                <input id="latticeTranslateW" type="range" min="-2.00" max="2.00" step="0.01" value="0.00" />
+                <output for="latticeTranslateW">0.00</output>
+                <small class="control-help">Moves the tesseract along the hidden w axis before 4D projection.</small>
+              </label>
               <div id="crystalMaterialBlock" class="control-block is-hidden">
                 <span>Crystal material</span>
                 <div class="segmented-control" id="crystalMaterial">

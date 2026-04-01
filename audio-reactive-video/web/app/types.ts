@@ -21,7 +21,7 @@ export type CombineMode = "signed" | "residual" | "percentile";
 export type SingleModeView = "amplitude" | "oscillation";
 export type FrameRateLimit = "auto" | "60";
 export type PlateShape = "square" | "circle";
-export type VisualMode = "spectral" | "crystal";
+export type VisualMode = "spectral" | "crystal" | "lattice";
 export type CrystalMaterial = "prism" | "opal" | "basalt";
 export type CrystalPalette = "glacial" | "verdigris" | "ember";
 export type ThemeKey =
@@ -115,6 +115,12 @@ export interface AppState {
   crystalFlow: number;
   crystalTension: number;
   crystalBloom: number;
+  latticePerspectiveEnabled: boolean;
+  latticeRotationSpeed: number;
+  latticeTranslateX: number;
+  latticeTranslateY: number;
+  latticeTranslateZ: number;
+  latticeTranslateW: number;
   activeTheme: ActiveTheme;
   lowBandColor: RGBColor;
   midBandColor: RGBColor;

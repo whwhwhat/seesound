@@ -21,6 +21,17 @@ import {
   displayModeButtons,
   frameRateLimitButtons,
   highColorInput,
+  latticePerspectiveEnabledInput,
+  latticeRotationSpeedInput,
+  latticeRotationSpeedOutput,
+  latticeTranslateWInput,
+  latticeTranslateWOutput,
+  latticeTranslateXInput,
+  latticeTranslateXOutput,
+  latticeTranslateYInput,
+  latticeTranslateYOutput,
+  latticeTranslateZInput,
+  latticeTranslateZOutput,
   lowColorInput,
   midColorInput,
   numericControls,
@@ -72,6 +83,9 @@ import {
   primeCrystalRenderer,
 } from "../render/crystal-webgpu";
 import {
+  primeLatticeRenderer,
+} from "../render/lattice-webgpu";
+import {
   requestRender,
 } from "../render/renderer";
 import type {
@@ -121,6 +135,26 @@ function bindEventHandlers() {
   });
   bindCrystalRange(crystalBloomInput, crystalBloomOutput, (value) => {
     state.crystalBloom = value;
+  });
+  bindCrystalRange(latticeRotationSpeedInput, latticeRotationSpeedOutput, (value) => {
+    state.latticeRotationSpeed = value;
+  });
+  bindCrystalRange(latticeTranslateXInput, latticeTranslateXOutput, (value) => {
+    state.latticeTranslateX = value;
+  });
+  bindCrystalRange(latticeTranslateYInput, latticeTranslateYOutput, (value) => {
+    state.latticeTranslateY = value;
+  });
+  bindCrystalRange(latticeTranslateZInput, latticeTranslateZOutput, (value) => {
+    state.latticeTranslateZ = value;
+  });
+  bindCrystalRange(latticeTranslateWInput, latticeTranslateWOutput, (value) => {
+    state.latticeTranslateW = value;
+  });
+
+  latticePerspectiveEnabledInput.addEventListener("change", () => {
+    state.latticePerspectiveEnabled = latticePerspectiveEnabledInput.checked;
+    requestRender();
   });
 
   atmosphereEnabledInput.addEventListener("change", () => {
@@ -252,7 +286,13 @@ function bindEventHandlers() {
 
   visualModeButtons.forEach((button) => {
     button.addEventListener("click", () => {
-      state.visualMode = button.dataset.visualMode === "crystal" ? "crystal" : "spectral";
+      const nextMode = button.dataset.visualMode;
+      state.visualMode =
+        nextMode === "crystal"
+          ? "crystal"
+          : nextMode === "lattice"
+            ? "lattice"
+            : "spectral";
       visualModeButtons.forEach((item) => {
         item.classList.toggle("is-active", item === button);
       });
@@ -260,9 +300,17 @@ function bindEventHandlers() {
       applyModeCopy();
       statusNode.textContent = state.visualMode === "crystal"
         ? "Crystal mode active. Harmonic membrane rendering is driving the scene."
-        : "Spectral mode active. Resonance field rendering is back online.";
+        : state.visualMode === "lattice"
+          ? "Lattice mode active. Spatial wireframe projection is driving the scene."
+          : "Spectral mode active. Resonance field rendering is back online.";
       if (state.visualMode === "crystal") {
         void primeCrystalRenderer().then(() => {
+          requestRender();
+        });
+        return;
+      }
+      if (state.visualMode === "lattice") {
+        void primeLatticeRenderer().then(() => {
           requestRender();
         });
         return;

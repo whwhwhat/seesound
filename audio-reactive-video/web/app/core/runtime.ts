@@ -85,6 +85,9 @@ import type {
   ThemeKey,
 } from "../types";
 
+const FILE_ANALYSER_SMOOTHING = 0.78;
+const CAPTURE_ANALYSER_SMOOTHING = 0.58;
+
 function ensureProfilerOverlay() {
   if (!profiler.enabled) {
     if (profiler.overlay) {
@@ -435,7 +438,7 @@ function ensureAudioGraph(): void {
   state.audioContext = new AudioContext();
   state.analyser = state.audioContext.createAnalyser();
   state.analyser.fftSize = FFT_SIZE;
-  state.analyser.smoothingTimeConstant = 0.78;
+  state.analyser.smoothingTimeConstant = FILE_ANALYSER_SMOOTHING;
   state.freqData = new Uint8Array(state.analyser.frequencyBinCount);
   state.timeData = new Uint8Array(state.analyser.fftSize);
   updateModeLabel();
@@ -464,6 +467,7 @@ function connectAudioElementSource(): void {
     state.audioElementSourceNode = state.audioContext.createMediaElementSource(audio);
   }
   disconnectAudioInputs();
+  state.analyser.smoothingTimeConstant = FILE_ANALYSER_SMOOTHING;
   state.audioElementSourceNode.connect(state.analyser);
   state.audioElementSourceNode.connect(state.audioContext.destination);
   setActiveAudioInput("file");
@@ -475,6 +479,7 @@ function connectCaptureStream(stream: MediaStream): void {
     return;
   }
   disconnectAudioInputs();
+  state.analyser.smoothingTimeConstant = CAPTURE_ANALYSER_SMOOTHING;
   state.captureSourceNode = state.audioContext.createMediaStreamSource(stream);
   state.captureSourceNode.connect(state.analyser);
   state.captureStream = stream;

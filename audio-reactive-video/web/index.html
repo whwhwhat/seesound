@@ -27,7 +27,32 @@
               <p class="section-title">Playback</p>
               <p id="playbackKicker" class="session-kicker">Start with a track, then shape the field in real time.</p>
             </div>
-            <div class="audio-player">
+            <div class="source-mode">
+              <div id="audioInputModeWrap" class="custom-select">
+                <span>Source</span>
+                <div class="select-shell">
+                  <button id="audioInputModeTrigger" class="select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                    <span id="audioInputModeValue">File</span>
+                    <span class="select-chevron" aria-hidden="true"></span>
+                  </button>
+                  <div id="audioInputModeMenu" class="select-menu" role="listbox" hidden>
+                    <button type="button" class="select-option" data-select="audio-input-mode" data-value="file">File</button>
+                    <button type="button" class="select-option" data-select="audio-input-mode" data-value="capture">Browser Tab</button>
+                  </div>
+                  <select id="audioInputModeSelect" class="native-control-hidden">
+                    <option value="file">File</option>
+                    <option value="capture">Browser Tab</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div id="audioCapturePanel" class="source-actions" hidden>
+              <button id="audioCaptureToggle" class="audio-capture-toggle" type="button" aria-label="Capture browser tab audio">
+                Capture Browser Tab Audio
+              </button>
+            </div>
+            <div id="audioPlayerCard" class="audio-player">
+              <div id="audioFilePanel">
               <div class="audio-player__row">
                 <button id="audioPlayPause" class="audio-player__play" type="button" aria-label="Play audio">
                   <span class="audio-player__play-icon" aria-hidden="true"></span>
@@ -58,13 +83,11 @@
                   </svg>
                   <input id="audioFile" type="file" accept="audio/*" />
                 </label>
-                <button id="audioCaptureToggle" class="audio-player__capture" type="button" aria-label="Capture browser tab audio">
-                  Tab
-                </button>
+              </div>
               </div>
               <audio id="audio" preload="metadata"></audio>
             </div>
-            <div class="session-meta">
+            <div id="audioMeta" class="session-meta">
               <p id="currentTrack" class="current-track">No track loaded</p>
               <p id="status" class="status-pill">Load audio to start the analyser.</p>
             </div>
@@ -73,12 +96,23 @@
           <div class="controls-section">
             <p class="section-title">Visual Style</p>
             <div class="control-grid">
-              <div class="control-block">
+              <div id="visualModeWrap" class="custom-select">
                 <span>Visual mode</span>
-                <div class="segmented-control" id="visualMode">
-                  <button type="button" data-visual-mode="spectral" class="is-active">Spectral</button>
-                  <button type="button" data-visual-mode="crystal">Crystal</button>
-                  <button type="button" data-visual-mode="lattice">Lattice</button>
+                <div class="select-shell">
+                  <button id="visualModeTrigger" class="select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                    <span id="visualModeValue">Spectral</span>
+                    <span class="select-chevron" aria-hidden="true"></span>
+                  </button>
+                  <div id="visualModeMenu" class="select-menu" role="listbox" hidden>
+                    <button type="button" class="select-option" data-select="visual-mode" data-value="spectral">Spectral</button>
+                    <button type="button" class="select-option" data-select="visual-mode" data-value="crystal">Crystal</button>
+                    <button type="button" class="select-option" data-select="visual-mode" data-value="lattice">Lattice</button>
+                  </div>
+                  <select id="visualModeSelect" class="native-control-hidden">
+                    <option value="spectral">Spectral</option>
+                    <option value="crystal">Crystal</option>
+                    <option value="lattice">Lattice</option>
+                  </select>
                 </div>
                 <small class="control-help">Spectral keeps the resonance field. Crystal becomes a harmonic membrane. Lattice becomes a projected spatial wireframe.</small>
               </div>

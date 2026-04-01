@@ -1,6 +1,10 @@
 import {
   appShell,
   atmosphereEnabledInput,
+  audioInputModeMenu,
+  audioInputModeSelect,
+  audioInputModeTrigger,
+  audioInputModeValue,
   canvas,
   combineModeMenu,
   combineModeSelect,
@@ -45,7 +49,10 @@ import {
   themeSelect,
   themeTrigger,
   themeValue,
-  visualModeButtons,
+  visualModeMenu,
+  visualModeSelect,
+  visualModeTrigger,
+  visualModeValue,
   glCanvas,
   wgpuCanvas,
 } from "../state/dom";
@@ -184,21 +191,45 @@ function bindEventHandlers() {
   };
 
   const closeAllMenus = () => {
+    closeSelectMenu(audioInputModeTrigger, audioInputModeMenu);
+    closeSelectMenu(visualModeTrigger, visualModeMenu);
     closeSelectMenu(themeTrigger, themeMenu);
     closeSelectMenu(combineModeTrigger, combineModeMenu);
   };
 
+  updateSelectLabel(audioInputModeValue, audioInputModeSelect);
+  updateSelectLabel(visualModeValue, visualModeSelect);
   updateSelectLabel(themeValue, themeSelect);
   updateSelectLabel(combineModeValue, combineModeSelect);
 
+  audioInputModeTrigger.addEventListener("click", (event) => {
+    event.stopPropagation();
+    closeSelectMenu(visualModeTrigger, visualModeMenu);
+    closeSelectMenu(themeTrigger, themeMenu);
+    closeSelectMenu(combineModeTrigger, combineModeMenu);
+    toggleSelectMenu(audioInputModeTrigger, audioInputModeMenu);
+  });
+
+  visualModeTrigger.addEventListener("click", (event) => {
+    event.stopPropagation();
+    closeSelectMenu(audioInputModeTrigger, audioInputModeMenu);
+    closeSelectMenu(themeTrigger, themeMenu);
+    closeSelectMenu(combineModeTrigger, combineModeMenu);
+    toggleSelectMenu(visualModeTrigger, visualModeMenu);
+  });
+
   themeTrigger.addEventListener("click", (event) => {
     event.stopPropagation();
+    closeSelectMenu(audioInputModeTrigger, audioInputModeMenu);
+    closeSelectMenu(visualModeTrigger, visualModeMenu);
     closeSelectMenu(combineModeTrigger, combineModeMenu);
     toggleSelectMenu(themeTrigger, themeMenu);
   });
 
   combineModeTrigger.addEventListener("click", (event) => {
     event.stopPropagation();
+    closeSelectMenu(audioInputModeTrigger, audioInputModeMenu);
+    closeSelectMenu(visualModeTrigger, visualModeMenu);
     closeSelectMenu(themeTrigger, themeMenu);
     toggleSelectMenu(combineModeTrigger, combineModeMenu);
   });
@@ -208,6 +239,20 @@ function bindEventHandlers() {
       const target = option.dataset.select;
       const value = option.dataset.value;
       if (!value) {
+        return;
+      }
+      if (target === "audio-input-mode") {
+        audioInputModeSelect.value = value;
+        updateSelectLabel(audioInputModeValue, audioInputModeSelect);
+        closeSelectMenu(audioInputModeTrigger, audioInputModeMenu);
+        audioInputModeSelect.dispatchEvent(new Event("input", { bubbles: true }));
+        return;
+      }
+      if (target === "visual-mode") {
+        visualModeSelect.value = value;
+        updateSelectLabel(visualModeValue, visualModeSelect);
+        closeSelectMenu(visualModeTrigger, visualModeMenu);
+        visualModeSelect.dispatchEvent(new Event("input", { bubbles: true }));
         return;
       }
       if (target === "theme") {
@@ -284,39 +329,35 @@ function bindEventHandlers() {
     });
   });
 
-  visualModeButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      const nextMode = button.dataset.visualMode;
-      state.visualMode =
-        nextMode === "crystal"
-          ? "crystal"
-          : nextMode === "lattice"
-            ? "lattice"
-            : "spectral";
-      visualModeButtons.forEach((item) => {
-        item.classList.toggle("is-active", item === button);
+  visualModeSelect.addEventListener("input", () => {
+    const nextMode = visualModeSelect.value;
+    state.visualMode =
+      nextMode === "crystal"
+        ? "crystal"
+        : nextMode === "lattice"
+          ? "lattice"
+          : "spectral";
+    updateSelectLabel(visualModeValue, visualModeSelect);
+    syncControlVisibility();
+    applyModeCopy();
+    statusNode.textContent = state.visualMode === "crystal"
+      ? "Crystal mode active. Harmonic membrane rendering is driving the scene."
+      : state.visualMode === "lattice"
+        ? "Lattice mode active. Spatial wireframe projection is driving the scene."
+        : "Spectral mode active. Resonance field rendering is back online.";
+    if (state.visualMode === "crystal") {
+      void primeCrystalRenderer().then(() => {
+        requestRender();
       });
-      syncControlVisibility();
-      applyModeCopy();
-      statusNode.textContent = state.visualMode === "crystal"
-        ? "Crystal mode active. Harmonic membrane rendering is driving the scene."
-        : state.visualMode === "lattice"
-          ? "Lattice mode active. Spatial wireframe projection is driving the scene."
-          : "Spectral mode active. Resonance field rendering is back online.";
-      if (state.visualMode === "crystal") {
-        void primeCrystalRenderer().then(() => {
-          requestRender();
-        });
-        return;
-      }
-      if (state.visualMode === "lattice") {
-        void primeLatticeRenderer().then(() => {
-          requestRender();
-        });
-        return;
-      }
-      requestRender();
-    });
+      return;
+    }
+    if (state.visualMode === "lattice") {
+      void primeLatticeRenderer().then(() => {
+        requestRender();
+      });
+      return;
+    }
+    requestRender();
   });
 
   crystalMaterialButtons.forEach((button) => {

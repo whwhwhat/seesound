@@ -217,15 +217,18 @@ output,
   background: rgba(255, 255, 255, 0.03);
 }
 
+.source-mode {
+  margin-bottom: 4px;
+}
+
 .audio-player__row {
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) auto auto auto auto;
+  grid-template-columns: 46px minmax(0, 1fr) auto auto auto;
   column-gap: 10px;
   align-items: center;
 }
 
 .audio-player__play,
-.audio-player__capture,
 .audio-player__load,
 .audio-player__volume-button {
   display: inline-flex;
@@ -370,25 +373,6 @@ output,
   transition: background-color 140ms ease;
 }
 
-.audio-player__capture {
-  min-width: 54px;
-  padding: 0 14px;
-  border: 1px solid rgba(173, 215, 223, 0.16);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.035);
-  cursor: pointer;
-  font: 0.75rem/1 "IBM Plex Mono", monospace;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
-}
-
-.audio-player__capture.is-live {
-  border-color: rgba(130, 237, 216, 0.54);
-  background: rgba(130, 237, 216, 0.12);
-  color: rgba(217, 255, 248, 0.96);
-}
-
 .audio-player__volume-popover {
   position: absolute;
   right: calc(100% + 10px);
@@ -435,13 +419,11 @@ output,
 }
 
 .audio-player__volume-button:hover,
-.audio-player__capture:hover,
 .audio-player__load:hover {
   background: rgba(255, 255, 255, 0.08);
 }
 
 .audio-player__volume-button:active,
-.audio-player__capture:active,
 .audio-player__load:active {
   background: rgba(255, 255, 255, 0.12);
 }
@@ -467,12 +449,69 @@ output,
   display: none;
 }
 
+.audio-player.is-readonly {
+  opacity: 0.78;
+}
+
 .audio-player__seek:disabled,
 .audio-player__volume-slider:disabled,
-.audio-player__capture:disabled,
+.audio-player__volume-button:disabled,
+.audio-player__load:disabled,
 .audio-player__play:disabled {
   cursor: not-allowed;
   opacity: 0.56;
+}
+
+.source-actions {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 4px 2px 2px;
+}
+
+#audioFilePanel[hidden],
+.audio-player[hidden],
+.session-meta[hidden],
+.source-actions[hidden] {
+  display: none !important;
+}
+
+.audio-capture-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid rgba(173, 215, 223, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  cursor: pointer;
+  font: 0.76rem/1 "IBM Plex Mono", monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.audio-capture-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.audio-capture-toggle:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.audio-capture-toggle.is-live {
+  border-color: rgba(130, 237, 216, 0.54);
+  background: rgba(130, 237, 216, 0.12);
+  color: rgba(217, 255, 248, 0.96);
+}
+
+.source-actions__hint {
+  margin: 0;
+  color: rgba(155, 178, 184, 0.64);
+  font-size: 0.8rem;
+  line-height: 1.45;
 }
 
 @media (max-width: 720px) {
@@ -486,9 +525,6 @@ output,
     justify-self: end;
   }
 
-  .audio-player__capture {
-    justify-self: end;
-  }
 }
 
 .current-track {

@@ -1,6 +1,12 @@
 import {
   audio,
+  audioCapturePanel,
   audioCaptureToggleButton,
+  audioFilePanel,
+  audioInputModeSelect,
+  audioInputModeValue,
+  audioMeta,
+  audioPlayerCard,
   audioPlayPauseButton,
   audioSeekInput,
   audioTimeNode,
@@ -11,6 +17,9 @@ import {
   fileInput,
   statusNode,
 } from "../state/dom";
+import type {
+  AudioInputSource,
+} from "../types";
 import {
   state,
 } from "../state/runtime-state";
@@ -38,6 +47,7 @@ import {
 
 let audioPlayerBound = false;
 let volumeOpen = false;
+let selectedInputMode: AudioInputSource = "file";
 
 function setVolumeOpen(open: boolean) {
   volumeOpen = open;
@@ -64,10 +74,56 @@ function isCaptureMode(): boolean {
   return state.activeAudioSource === "capture";
 }
 
+function syncInputModeUi(): void {
+  const fileMode = selectedInputMode === "file";
+  audioPlayerCard.hidden = !fileMode;
+  audioMeta.hidden = !fileMode;
+  audioFilePanel.hidden = !fileMode;
+  audioCapturePanel.hidden = fileMode;
+  audioInputModeSelect.value = selectedInputMode;
+  audioInputModeValue.textContent = audioInputModeSelect.selectedOptions[0]?.textContent ?? "";
+}
+
+function restoreIdleSourceState(): void {
+  if (state.currentAudioObjectUrl) {
+    currentTrackNode.textContent = state.currentAudioFileName ?? getDefaultTrackLabel();
+    statusNode.textContent = state.currentAudioFileName ? getLoadedStatusText(state.currentAudioFileName) : getIdleStatusText();
+    return;
+  }
+  currentTrackNode.textContent = getDefaultTrackLabel();
+  statusNode.textContent = getIdleStatusText();
+}
+
+function setSelectedInputMode(mode: AudioInputSource): void {
+  if (selectedInputMode === mode) {
+    syncInputModeUi();
+    return;
+  }
+
+  if (mode === "capture") {
+    if (!audio.paused && !audio.ended) {
+      audio.pause();
+    } else if (state.activeAudioSource === "file") {
+      setActiveAudioInput(null);
+      stopAnimationLoop();
+      requestRender();
+    }
+  } else if (state.activeAudioSource === "capture") {
+    stopCaptureStream();
+    stopAnimationLoop();
+    restoreIdleSourceState();
+    requestRender();
+  }
+
+  selectedInputMode = mode;
+  syncInputModeUi();
+  syncAudioUi();
+}
+
 function updateCaptureButtonUi(): void {
   const captureLive = isCaptureMode() && state.isAudioInputActive;
   audioCaptureToggleButton.classList.toggle("is-live", captureLive);
-  audioCaptureToggleButton.textContent = captureLive ? "Stop" : "Tab";
+  audioCaptureToggleButton.textContent = captureLive ? "Stop Browser Tab Capture" : "Capture Browser Tab Audio";
   audioCaptureToggleButton.setAttribute("aria-label", captureLive ? "Stop browser tab capture" : "Capture browser tab audio");
 }
 
@@ -86,27 +142,30 @@ function syncAudioUi() {
         ? "mid"
         : "high";
 
+  audioPlayPauseButton.disabled = captureMode;
   audioSeekInput.disabled = captureMode || !Number.isFinite(audio.duration) || audio.duration <= 0;
+  audioVolumeToggleButton.disabled = captureMode;
+  audioVolumeInput.disabled = captureMode;
+  fileInput.disabled = captureMode;
+  audioVolumeWrap.classList.toggle("is-disabled", captureMode);
+  audio.closest(".audio-player")?.classList.toggle("is-readonly", captureMode);
+  if (captureMode && volumeOpen) {
+    setVolumeOpen(false);
+  }
   audioSeekInput.value = String(progress);
   audioSeekInput.style.setProperty("--seek-fill", `${(progress / 10).toFixed(3)}%`);
   audioTimeNode.textContent = captureMode ? "LIVE" : `${formatPlaybackTime(currentTime)} / ${formatPlaybackTime(duration)}`;
   audioVolumeInput.value = String(Math.round(volume * 100));
   audioVolumeInput.style.setProperty("--seek-fill", `${(volume * 100).toFixed(3)}%`);
   audioPlayPauseButton.classList.toggle("is-playing", isPlaying);
-  audioPlayPauseButton.setAttribute("aria-label", captureMode ? "Stop captured tab audio" : isPlaying ? "Pause audio" : "Play audio");
+  audioPlayPauseButton.setAttribute("aria-label", isPlaying ? "Pause audio" : "Play audio");
   audioVolumeToggleButton.dataset.volumeLevel = volumeLevel;
   updateCaptureButtonUi();
 }
 
 function handleCaptureEnded(): void {
   stopCaptureStream();
-  if (state.currentAudioObjectUrl) {
-    currentTrackNode.textContent = state.currentAudioFileName ?? getDefaultTrackLabel();
-    statusNode.textContent = state.currentAudioFileName ? getLoadedStatusText(state.currentAudioFileName) : getIdleStatusText();
-  } else {
-    currentTrackNode.textContent = getDefaultTrackLabel();
-    statusNode.textContent = getIdleStatusText();
-  }
+  restoreIdleSourceState();
   stopAnimationLoop();
   syncAudioUi();
   requestRender();
@@ -158,11 +217,12 @@ function bindAudioPlayer() {
   }
   audioPlayerBound = true;
 
+  const initialMode = audioInputModeSelect.value;
+  if (initialMode === "file" || initialMode === "capture") {
+    selectedInputMode = initialMode;
+  }
+
   audioPlayPauseButton.addEventListener("click", async () => {
-    if (isCaptureMode()) {
-      handleCaptureEnded();
-      return;
-    }
     if (!audio.src) {
       fileInput.click();
       return;
@@ -184,7 +244,15 @@ function bindAudioPlayer() {
       handleCaptureEnded();
       return;
     }
+    setSelectedInputMode("capture");
     await startTabCapture();
+  });
+
+  audioInputModeSelect.addEventListener("input", () => {
+    const mode = audioInputModeSelect.value;
+    if (mode === "file" || mode === "capture") {
+      setSelectedInputMode(mode);
+    }
   });
 
   audioVolumeToggleButton.addEventListener("click", (event) => {
@@ -198,6 +266,8 @@ function bindAudioPlayer() {
       return;
     }
     ensureAudioGraph();
+    selectedInputMode = "file";
+    syncInputModeUi();
     stopCaptureStream();
     setActiveAudioInput(null);
     if (state.currentAudioObjectUrl) {
@@ -289,6 +359,7 @@ function bindAudioPlayer() {
   });
 
   setVolumeOpen(false);
+  syncInputModeUi();
   syncAudioUi();
 }
 

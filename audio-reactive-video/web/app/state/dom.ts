@@ -40,6 +40,15 @@ const ctx = requireCanvasContext(canvas);
 const wgpuCanvas = requireElement<HTMLCanvasElement>("previewWgpu");
 const glCanvas = requireElement<HTMLCanvasElement>("previewGl");
 const audio = requireElement<HTMLAudioElement>("audio");
+const audioInputModeWrap = requireElement<HTMLElement>("audioInputModeWrap");
+const audioInputModeTrigger = requireElement<HTMLButtonElement>("audioInputModeTrigger");
+const audioInputModeMenu = requireElement<HTMLElement>("audioInputModeMenu");
+const audioInputModeValue = requireElement<HTMLElement>("audioInputModeValue");
+const audioInputModeSelect = requireElement<HTMLSelectElement>("audioInputModeSelect");
+const audioPlayerCard = requireElement<HTMLElement>("audioPlayerCard");
+const audioFilePanel = requireElement<HTMLElement>("audioFilePanel");
+const audioCapturePanel = requireElement<HTMLElement>("audioCapturePanel");
+const audioMeta = requireElement<HTMLElement>("audioMeta");
 const audioPlayPauseButton = requireElement<HTMLButtonElement>("audioPlayPause");
 const audioSeekInput = requireElement<HTMLInputElement>("audioSeek");
 const audioTimeNode = requireElement<HTMLElement>("audioTime");
@@ -55,7 +64,11 @@ const heroTitle = requireElement<HTMLHeadingElement>("heroTitle");
 const heroLede = requireElement<HTMLParagraphElement>("heroLede");
 const playbackKicker = requireElement<HTMLParagraphElement>("playbackKicker");
 const statusNode = requireElement<HTMLParagraphElement>("status");
-const visualModeButtons = getSegmentedButtons("visualMode", "button[data-visual-mode]");
+const visualModeWrap = requireElement<HTMLElement>("visualModeWrap");
+const visualModeTrigger = requireElement<HTMLButtonElement>("visualModeTrigger");
+const visualModeMenu = requireElement<HTMLElement>("visualModeMenu");
+const visualModeValue = requireElement<HTMLElement>("visualModeValue");
+const visualModeSelect = requireElement<HTMLSelectElement>("visualModeSelect");
 const crystalModeNote = requireElement<HTMLParagraphElement>("crystalModeNote");
 const latticeModeNote = requireElement<HTMLParagraphElement>("latticeModeNote");
 const latticePerspectiveWrap = requireElement<HTMLLabelElement>("latticePerspectiveWrap");
@@ -186,11 +199,20 @@ export {
   atmosphereEnabledInput,
   atmosphereWrap,
   audio,
+  audioCapturePanel,
   audioPlayPauseButton,
   audioSeekInput,
   audioTimeNode,
   audioVolumeInput,
   audioCaptureToggleButton,
+  audioFilePanel,
+  audioInputModeMenu,
+  audioInputModeSelect,
+  audioInputModeTrigger,
+  audioInputModeValue,
+  audioInputModeWrap,
+  audioMeta,
+  audioPlayerCard,
   audioVolumeToggleButton,
   audioVolumeWrap,
   bandLabel,
@@ -292,6 +314,10 @@ export {
   themeTrigger,
   themeValue,
   themeWrap,
-  visualModeButtons,
+  visualModeMenu,
+  visualModeSelect,
+  visualModeTrigger,
+  visualModeValue,
+  visualModeWrap,
   wgpuCanvas,
 };

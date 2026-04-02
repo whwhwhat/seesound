@@ -59,6 +59,7 @@ const fileInput = requireElement<HTMLInputElement>("audioFile");
 const audioCaptureToggleButton = requireElement<HTMLButtonElement>("audioCaptureToggle");
 const panelCollapseHandle = requireElement<HTMLButtonElement>("panelCollapseHandle");
 const panelExpandHandle = requireElement<HTMLButtonElement>("panelExpandHandle");
+const fullscreenToggleButton = requireElement<HTMLButtonElement>("fullscreenToggle");
 const currentTrackNode = requireElement<HTMLParagraphElement>("currentTrack");
 const heroTitle = requireElement<HTMLHeadingElement>("heroTitle");
 const heroLede = requireElement<HTMLParagraphElement>("heroLede");
@@ -275,6 +276,7 @@ export {
   displayModeButtons,
   fieldBehaviorSection,
   fileInput,
+  fullscreenToggleButton,
   frameRateLimitButtons,
   glCanvas,
   glowIntensityWrap,

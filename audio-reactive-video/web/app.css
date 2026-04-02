@@ -98,6 +98,15 @@ body {
   min-width: 0;
 }
 
+#appShell:fullscreen {
+  width: 100vw;
+  height: 100vh;
+}
+
+#appShell:fullscreen.is-cursor-hidden {
+  cursor: none;
+}
+
 .panel-toggle {
   display: inline-flex;
   align-items: center;
@@ -1087,6 +1096,15 @@ output,
   box-shadow: none;
 }
 
+#appShell:fullscreen .viewport-panel {
+  margin-left: 0;
+}
+
+#appShell:fullscreen .viewport-stage {
+  width: min(100vw, 100vh);
+  border-radius: 0;
+}
+
 #previewWgpu,
 #previewGl,
 #preview {
@@ -1118,23 +1136,34 @@ output,
 }
 
 .panel-edge-hotspot,
-.panel-left-hotspot {
+.panel-left-hotspot,
+.panel-top-right-hotspot {
   position: fixed;
-  top: 0;
-  bottom: 0;
   z-index: 25;
 }
 
 .panel-edge-hotspot {
+  top: 0;
+  bottom: 0;
   left: calc(var(--panel-outer-width) + 8px);
   width: 46px;
   pointer-events: auto;
 }
 
 .panel-left-hotspot {
+  top: 0;
+  bottom: 0;
   left: 0;
   width: 48px;
   pointer-events: none;
+}
+
+.panel-top-right-hotspot {
+  top: 0;
+  right: 0;
+  width: 80px;
+  height: 72px;
+  pointer-events: auto;
 }
 
 .panel-toggle--edge {
@@ -1152,21 +1181,30 @@ output,
   transform: translateY(-50%);
 }
 
+.panel-toggle--corner {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  opacity: 0;
+  transition: opacity 160ms ease, background-color 140ms ease;
+}
+
 .panel-edge-hotspot:hover .panel-toggle--edge,
-.panel-left-hotspot:hover .panel-toggle--left {
+.panel-left-hotspot:hover .panel-toggle--left,
+.panel-top-right-hotspot:hover .panel-toggle--corner {
   opacity: 0.92;
 }
 
-.app-shell.is-collapsed + .panel-edge-hotspot {
+.app-shell.is-collapsed .panel-edge-hotspot {
   opacity: 0;
   pointer-events: none;
 }
 
-.app-shell.is-collapsed + .panel-edge-hotspot + .panel-left-hotspot {
+.app-shell.is-collapsed .panel-left-hotspot {
   pointer-events: auto;
 }
 
-.app-shell:not(.is-collapsed) + .panel-edge-hotspot + .panel-left-hotspot {
+.app-shell:not(.is-collapsed) .panel-left-hotspot {
   opacity: 0;
   pointer-events: none;
 }

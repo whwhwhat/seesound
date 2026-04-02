@@ -436,25 +436,36 @@
           </div>
         </div>
       </section>
+
+      <div class="panel-edge-hotspot" aria-hidden="true">
+        <button id="panelCollapseHandle" class="panel-toggle panel-toggle--edge" type="button" aria-expanded="true" aria-label="Collapse control panel">
+          <svg class="panel-toggle__icon" viewBox="6 4 15 16" aria-hidden="true">
+            <polyline points="14 5 7 12 14 19"></polyline>
+            <polyline points="20 5 13 12 20 19"></polyline>
+          </svg>
+        </button>
+      </div>
+
+      <div class="panel-left-hotspot" aria-hidden="true">
+        <button id="panelExpandHandle" class="panel-toggle panel-toggle--edge panel-toggle--left" type="button" aria-expanded="false" aria-label="Expand control panel">
+          <svg class="panel-toggle__icon" viewBox="3 4 15 16" aria-hidden="true">
+            <polyline points="10 5 17 12 10 19"></polyline>
+            <polyline points="4 5 11 12 4 19"></polyline>
+          </svg>
+        </button>
+      </div>
+
+      <div class="panel-top-right-hotspot" aria-hidden="true">
+        <button id="fullscreenToggle" class="panel-toggle panel-toggle--corner" type="button" aria-pressed="false" aria-label="Enter fullscreen">
+          <svg class="panel-toggle__icon" viewBox="0 0 24 24" aria-hidden="true">
+            <polyline points="9 4 4 4 4 9"></polyline>
+            <polyline points="15 4 20 4 20 9"></polyline>
+            <polyline points="20 15 20 20 15 20"></polyline>
+            <polyline points="4 15 4 20 9 20"></polyline>
+          </svg>
+        </button>
+      </div>
     </main>
-
-    <div class="panel-edge-hotspot" aria-hidden="true">
-      <button id="panelCollapseHandle" class="panel-toggle panel-toggle--edge" type="button" aria-expanded="true" aria-label="Collapse control panel">
-        <svg class="panel-toggle__icon" viewBox="6 4 15 16" aria-hidden="true">
-          <polyline points="14 5 7 12 14 19"></polyline>
-          <polyline points="20 5 13 12 20 19"></polyline>
-        </svg>
-      </button>
-    </div>
-
-    <div class="panel-left-hotspot" aria-hidden="true">
-      <button id="panelExpandHandle" class="panel-toggle panel-toggle--edge panel-toggle--left" type="button" aria-expanded="false" aria-label="Expand control panel">
-        <svg class="panel-toggle__icon" viewBox="3 4 15 16" aria-hidden="true">
-          <polyline points="10 5 17 12 10 19"></polyline>
-          <polyline points="4 5 11 12 4 19"></polyline>
-        </svg>
-      </button>
-    </div>
 
     <div id="colorPickerPopover" class="color-picker-popover" hidden>
       <div class="color-picker" role="dialog" aria-label="Color picker">

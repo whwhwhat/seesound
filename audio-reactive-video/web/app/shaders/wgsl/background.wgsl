@@ -139,12 +139,6 @@ fn main(@builtin(position) position : vec4f) -> @location(0) vec4f {
     let ringInner = smoothstep(0.5 - ringWidth * 2.1, 0.5 - ringWidth * 0.8, circleDistance);
     let ringMix = clamp(ringOuter - ringInner, 0.0, 1.0);
     color = mix(color, params.baseBgColor.rgb * 0.92, ringMix * 0.96);
-  } else {
-    let canvasMin = max(min(canvasSize.x, canvasSize.y), 1.0);
-    let borderWidth = max(2.0 / canvasMin, 0.001);
-    let borderDist = min(min(localUv.x, localUv.y), min(1.0 - localUv.x, 1.0 - localUv.y));
-    let borderMix = 1.0 - smoothstep(0.0, borderWidth, borderDist);
-    color = mix(color, params.outerColor.rgb * 0.18, borderMix);
   }
 
   return vec4f(clamp(color / 255.0, vec3f(0.0), vec3f(1.0)), 1.0);

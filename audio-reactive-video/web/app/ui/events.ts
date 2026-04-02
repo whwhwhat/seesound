@@ -24,6 +24,7 @@ import {
   crystalTonalFocusOutput,
   displayModeButtons,
   frameRateLimitButtons,
+  fullscreenToggleButton,
   highColorInput,
   latticePerspectiveEnabledInput,
   latticeRotationSpeedInput,
@@ -103,6 +104,8 @@ import type {
 } from "../types";
 
 let eventsBound = false;
+let fullscreenCursorHideTimer = 0;
+let fullscreenPanelRestoreState: boolean | null = null;
 
 function bindEventHandlers() {
   if (eventsBound) {
@@ -295,6 +298,79 @@ function bindEventHandlers() {
   panelExpandHandle.addEventListener("click", () => {
     setPanelCollapsed(false);
   });
+
+  const syncFullscreenToggleState = () => {
+    const isFullscreen = document.fullscreenElement === appShell;
+    fullscreenToggleButton.setAttribute("aria-pressed", String(isFullscreen));
+    fullscreenToggleButton.setAttribute("aria-label", isFullscreen ? "Exit fullscreen" : "Enter fullscreen");
+    fullscreenToggleButton.setAttribute("title", isFullscreen ? "Exit fullscreen" : "Enter fullscreen");
+  };
+
+  const showFullscreenCursor = () => {
+    appShell.classList.remove("is-cursor-hidden");
+  };
+
+  const clearFullscreenCursorTimer = () => {
+    if (fullscreenCursorHideTimer) {
+      window.clearTimeout(fullscreenCursorHideTimer);
+      fullscreenCursorHideTimer = 0;
+    }
+  };
+
+  const scheduleFullscreenCursorHide = () => {
+    clearFullscreenCursorTimer();
+    fullscreenCursorHideTimer = window.setTimeout(() => {
+      if (document.fullscreenElement === appShell) {
+        appShell.classList.add("is-cursor-hidden");
+      }
+    }, 1500);
+  };
+
+  fullscreenToggleButton.addEventListener("click", async () => {
+    try {
+      if (document.fullscreenElement === appShell) {
+        await document.exitFullscreen();
+      } else {
+        fullscreenPanelRestoreState = appShell.classList.contains("is-collapsed");
+        setPanelCollapsed(true);
+        await appShell.requestFullscreen();
+      }
+    } catch {
+      if (fullscreenPanelRestoreState !== null && document.fullscreenElement !== appShell) {
+        setPanelCollapsed(fullscreenPanelRestoreState);
+        fullscreenPanelRestoreState = null;
+      }
+      statusNode.textContent = "Fullscreen was blocked. Try again from a direct click interaction.";
+    } finally {
+      syncFullscreenToggleState();
+    }
+  });
+
+  document.addEventListener("fullscreenchange", () => {
+    syncFullscreenToggleState();
+    if (document.fullscreenElement === appShell) {
+      showFullscreenCursor();
+      scheduleFullscreenCursorHide();
+    } else {
+      clearFullscreenCursorTimer();
+      showFullscreenCursor();
+      if (fullscreenPanelRestoreState !== null) {
+        setPanelCollapsed(fullscreenPanelRestoreState);
+        fullscreenPanelRestoreState = null;
+      }
+    }
+    requestRender();
+  });
+
+  document.addEventListener("pointermove", () => {
+    if (document.fullscreenElement !== appShell) {
+      return;
+    }
+    showFullscreenCursor();
+    scheduleFullscreenCursorHide();
+  });
+
+  syncFullscreenToggleState();
 
   plateShapeButtons.forEach((button) => {
     button.addEventListener("click", () => {

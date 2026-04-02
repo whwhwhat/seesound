@@ -1,5 +1,6 @@
 import {
   BASE_BG_COLOR,
+  appShell,
   atmosphereEnabledInput,
   canvas,
   ctx,
@@ -270,7 +271,8 @@ function compositeLegacyScene(
 
   ctx.strokeStyle = toRgba(themePalette.outerColor, 0.18);
   ctx.lineWidth = 2;
-  if (state.plateShape !== "circle") {
+  const isFullscreenSquarePlate = state.plateShape !== "circle" && document.fullscreenElement === appShell;
+  if (state.plateShape !== "circle" && !isFullscreenSquarePlate) {
     ctx.strokeRect(inset, inset, canvas.width - inset * 2, canvas.height - inset * 2);
   }
   if (!useDirectGpuPresentation && rotateCircleSigned) {

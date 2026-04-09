@@ -48,6 +48,7 @@ const audioInputModeSelect = requireElement<HTMLSelectElement>("audioInputModeSe
 const audioPlayerCard = requireElement<HTMLElement>("audioPlayerCard");
 const audioFilePanel = requireElement<HTMLElement>("audioFilePanel");
 const audioCapturePanel = requireElement<HTMLElement>("audioCapturePanel");
+const audioDesktopPanel = requireElement<HTMLElement>("audioDesktopPanel");
 const audioMeta = requireElement<HTMLElement>("audioMeta");
 const audioPlayPauseButton = requireElement<HTMLButtonElement>("audioPlayPause");
 const audioSeekInput = requireElement<HTMLInputElement>("audioSeek");
@@ -57,6 +58,8 @@ const audioVolumeToggleButton = requireElement<HTMLButtonElement>("audioVolumeTo
 const audioVolumeInput = requireElement<HTMLInputElement>("audioVolume");
 const fileInput = requireElement<HTMLInputElement>("audioFile");
 const audioCaptureToggleButton = requireElement<HTMLButtonElement>("audioCaptureToggle");
+const audioDesktopToggleButton = requireElement<HTMLButtonElement>("audioDesktopToggle");
+const audioDesktopHint = requireElement<HTMLParagraphElement>("audioDesktopHint");
 const panelCollapseHandle = requireElement<HTMLButtonElement>("panelCollapseHandle");
 const panelExpandHandle = requireElement<HTMLButtonElement>("panelExpandHandle");
 const fullscreenToggleButton = requireElement<HTMLButtonElement>("fullscreenToggle");
@@ -206,6 +209,9 @@ export {
   audioTimeNode,
   audioVolumeInput,
   audioCaptureToggleButton,
+  audioDesktopHint,
+  audioDesktopPanel,
+  audioDesktopToggleButton,
   audioFilePanel,
   audioInputModeMenu,
   audioInputModeSelect,

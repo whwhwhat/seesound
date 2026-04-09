@@ -38,10 +38,12 @@
                   <div id="audioInputModeMenu" class="select-menu" role="listbox" hidden>
                     <button type="button" class="select-option" data-select="audio-input-mode" data-value="file">File</button>
                     <button type="button" class="select-option" data-select="audio-input-mode" data-value="capture">Browser Tab</button>
+                    <button type="button" class="select-option" data-select="audio-input-mode" data-value="desktop">Desktop App</button>
                   </div>
                   <select id="audioInputModeSelect" class="native-control-hidden">
                     <option value="file">File</option>
                     <option value="capture">Browser Tab</option>
+                    <option value="desktop">Desktop App</option>
                   </select>
                 </div>
               </div>
@@ -50,6 +52,13 @@
               <button id="audioCaptureToggle" class="audio-capture-toggle" type="button" aria-label="Capture browser tab audio">
                 Capture Browser Tab Audio
               </button>
+              <p class="source-actions__hint">Choose a browser tab and enable audio sharing to drive the visualizer live.</p>
+            </div>
+            <div id="audioDesktopPanel" class="source-actions" hidden>
+              <button id="audioDesktopToggle" class="audio-capture-toggle" type="button" aria-label="Start desktop audio capture">
+                Start Desktop Audio
+              </button>
+              <p id="audioDesktopHint" class="source-actions__hint">Run the SeeSound Companion menu bar app, then start desktop capture.</p>
             </div>
             <div id="audioPlayerCard" class="audio-player">
               <div id="audioFilePanel">

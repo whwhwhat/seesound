@@ -55,7 +55,7 @@ function buildFrameContext(audioFrame: AudioFrame): FrameContext {
     rms,
   } = audioFrame;
 
-  const sampleRate = state.audioContext?.sampleRate ?? 48000;
+  const sampleRate = state.audioContext?.sampleRate ?? state.audioSampleRate ?? 48000;
   const field = renderBuffers.field;
   const colorWeight = renderBuffers.colorWeight;
   const colorAccum = renderBuffers.colorAccum;

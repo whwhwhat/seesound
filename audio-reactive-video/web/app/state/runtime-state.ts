@@ -81,6 +81,7 @@ const state: AppState = {
   activeAudioSource: null,
   captureStream: null,
   isAudioInputActive: false,
+  audioSampleRate: 48000,
   freqData: null,
   timeData: null,
   modeState: [],

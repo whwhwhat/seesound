@@ -37,7 +37,7 @@ export type ThemeKey =
 export type ActiveTheme = ThemeKey | "custom";
 export type ActiveRenderer = "legacy" | "webgpu";
 export type ActivePresentation = "cpu" | "webgl" | "native";
-export type AudioInputSource = "file" | "capture";
+export type AudioInputSource = "file" | "capture" | "desktop";
 
 export interface ModeState {
   m: number;
@@ -98,6 +98,7 @@ export interface AppState {
   activeAudioSource: AudioInputSource | null;
   captureStream: MediaStream | null;
   isAudioInputActive: boolean;
+  audioSampleRate: number;
   freqData: Uint8Array | null;
   timeData: Uint8Array | null;
   modeState: ModeState[];

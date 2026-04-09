@@ -73,6 +73,7 @@ import {
   ensureInactiveBands,
   getBandRanges,
 } from "./geometry";
+import DESKTOP_PCM_WORKLET_URL from "../audio/desktop-pcm-worklet.js?url";
 import type {
   AudioInputSource,
   AudioFrame,
@@ -87,6 +88,9 @@ import type {
 
 const FILE_ANALYSER_SMOOTHING = 0.78;
 const CAPTURE_ANALYSER_SMOOTHING = 0.58;
+let desktopSourceNode: AudioWorkletNode | null = null;
+let desktopSinkNode: GainNode | null = null;
+let desktopWorkletModulePromise: Promise<void> | null = null;
 
 function ensureProfilerOverlay() {
   if (!profiler.enabled) {
@@ -436,6 +440,7 @@ function ensureAudioGraph(): void {
   }
 
   state.audioContext = new AudioContext();
+  state.audioSampleRate = state.audioContext.sampleRate;
   state.analyser = state.audioContext.createAnalyser();
   state.analyser.fftSize = FFT_SIZE;
   state.analyser.smoothingTimeConstant = FILE_ANALYSER_SMOOTHING;
@@ -453,6 +458,8 @@ function setActiveAudioInput(source: AudioInputSource | null): void {
   state.activeAudioSource = source;
   state.isAudioInputActive = source === "capture"
     ? Boolean(state.captureStream?.active)
+    : source === "desktop"
+      ? Boolean(state.freqData && state.timeData)
     : source === "file"
       ? !audio.paused && !audio.ended && audio.currentTime > 0
       : false;
@@ -484,6 +491,82 @@ function connectCaptureStream(stream: MediaStream): void {
   state.captureSourceNode.connect(state.analyser);
   state.captureStream = stream;
   setActiveAudioInput("capture");
+}
+
+function connectDesktopAudioFrame(
+  frame: {
+    freq: Uint8Array;
+    time: Uint8Array;
+    isPlaying: boolean;
+    sampleRate?: number;
+  },
+): void {
+  stopCaptureStream();
+  disconnectAudioInputs();
+  state.freqData = frame.freq;
+  state.timeData = frame.time;
+  if (frame.sampleRate && Number.isFinite(frame.sampleRate) && frame.sampleRate > 0) {
+    state.audioSampleRate = frame.sampleRate;
+  }
+  state.activeAudioSource = "desktop";
+  state.isAudioInputActive = frame.isPlaying;
+}
+
+function stopDesktopAudioInput(): void {
+  desktopSourceNode?.port.postMessage({ type: "reset" });
+  desktopSourceNode?.disconnect();
+  desktopSourceNode = null;
+  desktopSinkNode?.disconnect();
+  desktopSinkNode = null;
+  if (state.activeAudioSource === "desktop") {
+    state.activeAudioSource = null;
+    state.isAudioInputActive = false;
+  }
+}
+
+async function ensureDesktopPcmBridge(): Promise<AudioWorkletNode | null> {
+  ensureAudioGraph();
+  if (!state.audioContext || !state.analyser || typeof AudioWorkletNode === "undefined") {
+    return null;
+  }
+
+  if (!desktopWorkletModulePromise) {
+    desktopWorkletModulePromise = state.audioContext.audioWorklet.addModule(DESKTOP_PCM_WORKLET_URL);
+  }
+  await desktopWorkletModulePromise;
+
+  if (!desktopSourceNode) {
+    desktopSourceNode = new AudioWorkletNode(state.audioContext, "desktop-pcm-bridge", {
+      numberOfInputs: 0,
+      numberOfOutputs: 1,
+      outputChannelCount: [1],
+    });
+    desktopSinkNode = state.audioContext.createGain();
+    desktopSinkNode.gain.value = 0;
+    desktopSourceNode.connect(state.analyser);
+    desktopSourceNode.connect(desktopSinkNode);
+    desktopSinkNode.connect(state.audioContext.destination);
+  }
+
+  state.analyser.smoothingTimeConstant = FILE_ANALYSER_SMOOTHING;
+  setActiveAudioInput("desktop");
+  return desktopSourceNode;
+}
+
+async function pushDesktopPcmChunk(
+  samples: Float32Array,
+  options: { isPlaying: boolean; sampleRate?: number },
+): Promise<void> {
+  const node = await ensureDesktopPcmBridge();
+  if (!node) {
+    return;
+  }
+  if (options.sampleRate && Number.isFinite(options.sampleRate) && options.sampleRate > 0) {
+    state.audioSampleRate = options.sampleRate;
+  }
+  state.activeAudioSource = "desktop";
+  state.isAudioInputActive = options.isPlaying;
+  node.port.postMessage({ type: "push", samples }, [samples.buffer]);
 }
 
 function stopCaptureStream(): void {
@@ -546,7 +629,7 @@ function buildModeRenderState(
 
 function groupBands(data: Uint8Array, groups: number): Float32Array {
   const values = new Float32Array(groups);
-  const sampleRate = state.audioContext?.sampleRate ?? 48000;
+  const sampleRate = state.audioContext?.sampleRate ?? state.audioSampleRate ?? 48000;
   const ranges = getBandRanges(groups, sampleRate);
 
   for (let group = 0; group < groups; group += 1) {
@@ -581,12 +664,15 @@ function updateModeState(): AudioFrame {
   }
 
   const isPlaying = Boolean(state.analyser) && (
-    state.activeAudioSource === "capture"
+    state.activeAudioSource === "desktop"
       ? state.isAudioInputActive
-      : state.activeAudioSource === "file"
-        ? !audio.paused && !audio.ended && audio.currentTime > 0
-        : false
+      : state.activeAudioSource === "capture"
+        ? state.isAudioInputActive
+        : state.activeAudioSource === "file"
+          ? !audio.paused && !audio.ended && audio.currentTime > 0
+          : false
   );
+
   if (!state.analyser || !isPlaying) {
     return { bands: ensureInactiveBands(targetCount), rms: 0, centroid: 0, isPlaying: false };
   }
@@ -637,10 +723,14 @@ export {
   buildModes,
   connectAudioElementSource,
   connectCaptureStream,
+  connectDesktopAudioFrame,
+  ensureDesktopPcmBridge,
   ensureAudioGraph,
   finishFrameProfile,
   getThemeGlowPalette,
   setActiveAudioInput,
+  pushDesktopPcmChunk,
+  stopDesktopAudioInput,
   stopCaptureStream,
   getThemeLineColor,
   profileSectionEnd,

@@ -65,13 +65,13 @@ function isSupported(): boolean {
 
 function buildPitchClassProfile(): Float32Array {
   const profile = new Float32Array(12);
-  if (!state.freqData || !state.audioContext) {
+  if (!state.freqData) {
     for (let index = 0; index < 12; index += 1) {
       state.crystalPitchProfile[index] *= 0.92;
     }
     return state.crystalPitchProfile;
   }
-  const sampleRate = state.audioContext.sampleRate;
+  const sampleRate = state.audioContext?.sampleRate ?? state.audioSampleRate ?? 48000;
   const binHz = sampleRate / FFT_SIZE;
   const harmonicWeights = [1, 0.82, 0.58, 0.42, 0.3];
   for (let index = 1; index < state.freqData.length; index += 1) {

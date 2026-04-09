@@ -23,3 +23,6 @@ dist/
 
 # generated assets
 audio-reactive-video/.arv-output/
+
+# swift build
+.build

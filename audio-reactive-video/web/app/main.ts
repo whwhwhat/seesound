@@ -22,6 +22,9 @@ import {
   bindEventHandlers,
 } from "./ui/events";
 import {
+  bindExportRecorder,
+} from "./export-recorder";
+import {
   initializeFieldGeometry,
 } from "./core/geometry";
 import {
@@ -47,6 +50,7 @@ applyModeCopy();
 bindAudioPlayer();
 bindColorPicker();
 bindEventHandlers();
+bindExportRecorder();
 window.dispatchEvent(new Event("resize"));
 void primeCrystalRenderer();
 void primeLatticeRenderer();

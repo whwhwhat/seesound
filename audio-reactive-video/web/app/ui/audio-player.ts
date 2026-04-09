@@ -50,6 +50,11 @@ import {
   startAnimationLoop,
   stopAnimationLoop,
 } from "../render/renderer";
+import {
+  isExportRecording,
+  stopExportRecording,
+  syncExportAvailability,
+} from "../export-recorder";
 
 let audioPlayerBound = false;
 let volumeOpen = false;
@@ -136,6 +141,7 @@ function syncAudioUi() {
   const progress = duration > 0 ? Math.round((currentTime / duration) * 1000) : 0;
   const volume = Math.min(1, Math.max(0, audio.volume));
   const isPlaying = liveMode ? state.isAudioInputActive : !audio.paused && !audio.ended;
+  const hasLoadedFile = Boolean(state.currentAudioObjectUrl || audio.src);
   const volumeLevel = volume <= 0.001
     ? "mute"
     : volume < 0.34
@@ -162,8 +168,12 @@ function syncAudioUi() {
   audioPlayPauseButton.classList.toggle("is-playing", isPlaying);
   audioPlayPauseButton.setAttribute("aria-label", isPlaying ? "Pause audio" : "Play audio");
   audioVolumeToggleButton.dataset.volumeLevel = volumeLevel;
+  if (!liveMode && hasLoadedFile && currentTrackNode.textContent === getDefaultTrackLabel()) {
+    currentTrackNode.textContent = state.currentAudioFileName ?? "Loaded track";
+  }
   updateCaptureButtonUi();
   updateDesktopButtonUi();
+  syncExportAvailability();
 }
 
 function stopDesktopBridgeCapture(options: { remote: boolean }): void {
@@ -510,6 +520,9 @@ function bindAudioPlayer() {
       return;
     }
     setActiveAudioInput(null);
+    if (isExportRecording()) {
+      stopExportRecording();
+    }
     statusNode.textContent = getEndedStatusText();
     syncAudioUi();
     stopAnimationLoop();

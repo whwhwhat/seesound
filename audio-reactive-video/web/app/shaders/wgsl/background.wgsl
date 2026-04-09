@@ -100,12 +100,17 @@ fn main(@builtin(position) position : vec4f) -> @location(0) vec4f {
   );
 
   let absValue = abs(normalizedField);
+  let residualMode = params.dynamics.y <= 1e-5;
   let nodeHalo = select(0.0, exp(-absValue * (params.dynamics.x / max(0.35, params.dynamics.w))), params.renderFlags.w < 0.5);
   let outerHalo = select(0.0, exp(-absValue * (params.dynamics.x / max(0.22, params.dynamics.w * 1.45))), params.renderFlags.w < 0.5);
   let displacement = pow(min(1.0, absValue), params.dynamics.z);
-  let underlayStrength = min(
-    1.0,
-    (displacement * params.dynamics.y * params.dynamics.w * 1.10 + nodeHalo * 0.12 + outerHalo * 0.06 + gradient * 0.04) * mask
+  let underlayStrength = select(
+    min(
+      1.0,
+      (displacement * params.dynamics.y * params.dynamics.w * 1.10 + nodeHalo * 0.12 + outerHalo * 0.06 + gradient * 0.04) * mask
+    ),
+    0.0,
+    residualMode
   );
 
   color = vec3f(
@@ -116,13 +121,13 @@ fn main(@builtin(position) position : vec4f) -> @location(0) vec4f {
 
   let accum = sampleTextureBilinear(colorAccumTex, fieldCoord).rgb;
   let weight = sampleTextureBilinear(colorWeightTex, fieldCoord).x;
-  if (weight > 1e-6) {
+  if (weight > 1e-6 && !residualMode) {
     let avgColor = accum / weight;
     let tintMix = clamp(underlayStrength * 0.18, 0.0, 0.24);
     color = mix(color, avgColor * 0.35 + color * 0.65, tintMix);
   }
 
-  let warmD = clamp01(underlayStrength + dither * 0.16);
+  let warmD = select(clamp01(underlayStrength + dither * 0.16), 0.0, residualMode);
   color += params.baseColor.rgb * warmD * 0.022;
 
   if (params.renderFlags.z > 0.5) {

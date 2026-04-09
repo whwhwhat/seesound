@@ -559,7 +559,8 @@ function shadeFieldOnGpu(params: GpuShadeParams): boolean {
   gl.uniform1f(shadePipeline.uniforms.glowThickness, params.glowThickness);
   gl.uniform1f(shadePipeline.uniforms.glowSpread, params.glowSpread);
   gl.uniform1f(shadePipeline.uniforms.atmosphereEnabled, params.atmosphereEnabled ? 1 : 0);
-  gl.uniform3f(shadePipeline.uniforms.baseBgColor, BASE_BG_COLOR[0], BASE_BG_COLOR[1], BASE_BG_COLOR[2]);
+  const baseBgColor = state.combineMode === "residual" ? [0, 0, 0] : BASE_BG_COLOR;
+  gl.uniform3f(shadePipeline.uniforms.baseBgColor, baseBgColor[0], baseBgColor[1], baseBgColor[2]);
   gl.uniform3f(shadePipeline.uniforms.backdropColor, params.themePalette.backdropColor[0], params.themePalette.backdropColor[1], params.themePalette.backdropColor[2]);
   gl.uniform3f(shadePipeline.uniforms.baseColor, params.themePalette.baseColor[0], params.themePalette.baseColor[1], params.themePalette.baseColor[2]);
   gl.uniform3f(shadePipeline.uniforms.lineColor, params.themePalette.lineColor[0], params.themePalette.lineColor[1], params.themePalette.lineColor[2]);

@@ -1104,11 +1104,12 @@ function encodeContourPass(encoder: GPUCommandEncoder): void {
 function encodeBackgroundPass(encoder: GPUCommandEncoder, targetView: GPUTextureView, params: WebGpuRenderParams): void {
   const readyState = requireInitializedWebGpuState();
   const reductionView = webGpuState.reductionChain[webGpuState.reductionChain.length - 1]?.view ?? getActiveFieldView();
+  const baseBgColor = state.combineMode === "residual" ? [0, 0, 0] : BASE_BG_COLOR;
   const backgroundParams = new Float32Array([
     wgpuCanvas.width, wgpuCanvas.height, params.centroid, params.rms,
     params.haloSharpness, params.backgroundWeight, params.contrast, params.singleAmpGate,
     params.isSingleMode ? 1 : 0, state.plateShape === "circle" ? 1 : 0, atmosphereEnabledInput.checked ? 1 : 0, params.renderAsDormantField ? 1 : 0,
-    BASE_BG_COLOR[0], BASE_BG_COLOR[1], BASE_BG_COLOR[2], 0,
+    baseBgColor[0], baseBgColor[1], baseBgColor[2], 0,
     params.themePalette.backdropColor[0], params.themePalette.backdropColor[1], params.themePalette.backdropColor[2], 0,
     params.themePalette.baseColor[0], params.themePalette.baseColor[1], params.themePalette.baseColor[2], 0,
     params.themePalette.outerColor[0], params.themePalette.outerColor[1], params.themePalette.outerColor[2], 0,
@@ -1135,9 +1136,9 @@ function encodeBackgroundPass(encoder: GPUCommandEncoder, targetView: GPUTexture
       {
         view: targetView,
         clearValue: {
-          r: BASE_BG_COLOR[0] / 255,
-          g: BASE_BG_COLOR[1] / 255,
-          b: BASE_BG_COLOR[2] / 255,
+          r: baseBgColor[0] / 255,
+          g: baseBgColor[1] / 255,
+          b: baseBgColor[2] / 255,
           a: 1,
         },
         loadOp: "clear",

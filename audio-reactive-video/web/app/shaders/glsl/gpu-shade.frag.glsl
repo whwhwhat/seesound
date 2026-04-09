@@ -62,6 +62,7 @@ void main() {
   float nodeCore = u_renderDormant > 0.5 ? 0.0 : exp(-absValue * (u_coreSharpness / thicknessNorm));
   float nodeHalo = u_renderDormant > 0.5 ? 0.0 : exp(-absValue * (u_haloSharpness / max(0.35, spreadNorm)));
   float outerHalo = u_renderDormant > 0.5 ? 0.0 : exp(-absValue * (u_haloSharpness / max(0.22, spreadNorm * 1.45)));
+  float residualMode = u_backgroundWeight <= 1e-5 ? 1.0 : 0.0;
   float lineStrength = nodeCore * (u_lineWeight + gradient * 1.25) * u_singleAmpGate;
   float haloStrength = nodeHalo * (u_haloWeight + gradient * 0.22) * u_singleAmpGate;
   float glowStrength = outerHalo * (0.06 + spreadNorm * 0.025 + u_singleAmpGate * 0.05);
@@ -84,9 +85,9 @@ void main() {
       : 0.0;
 
   vec3 color = vec3(
-    u_baseBgColor.r + warmD * u_backdropColor.r * 0.82 + brightD * u_baseColor.r * 0.12,
-    u_baseBgColor.g + brightD * u_backdropColor.g * 0.84 + lineStrength * u_lineColor.g * 0.12,
-    u_baseBgColor.b + coolD * u_backdropColor.b * 0.92 + lineStrength * u_lineColor.b * 0.1
+    u_baseBgColor.r + (1.0 - residualMode) * (warmD * u_backdropColor.r * 0.82 + brightD * u_baseColor.r * 0.12),
+    u_baseBgColor.g + (1.0 - residualMode) * (brightD * u_backdropColor.g * 0.84) + lineStrength * u_lineColor.g * 0.12,
+    u_baseBgColor.b + (1.0 - residualMode) * (coolD * u_backdropColor.b * 0.92) + lineStrength * u_lineColor.b * 0.1
   );
   color += u_atmosphereCore * atmosphereMix + u_atmosphereOuter * atmosphereEdge;
   color += u_outerColor * glowStrength * 0.14;
@@ -95,7 +96,7 @@ void main() {
   if (u_useGlowColor > 0.5) {
     vec3 accum = texture(u_colorAccumTex, v_uv).rgb;
     float weight = texture(u_colorWeightTex, v_uv).r;
-    if (weight > 1e-6) {
+    if (weight > 1e-6 && residualMode < 0.5) {
       vec3 avgColor = accum / weight;
       float monoLuma = dot(color, vec3(0.2126, 0.7152, 0.0722));
       float avgLuma = dot(avgColor, vec3(0.2126, 0.7152, 0.0722));

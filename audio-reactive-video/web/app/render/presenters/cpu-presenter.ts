@@ -63,6 +63,8 @@ function shadeFieldOnCpu(
     coreSharpness,
   } = frameContext;
   const displayScale = resolveDisplayScale(field, isSingleMode);
+  const residualMode = state.combineMode === "residual";
+  const baseBgColor: RGBColor = residualMode ? [0, 0, 0] : BASE_BG_COLOR;
 
   const profileStart = frameProfileTools.profileSectionStart(frameProfileTools.frameProfile);
   let ptr = 0;
@@ -88,20 +90,20 @@ function shadeFieldOnCpu(
       const brightD = Math.min(1, Math.max(0, brightness + dither));
       const coolD = Math.min(1, Math.max(0, cool + dither * 0.55));
 
-      let red =
-        BASE_BG_COLOR[0] +
-        warmD * themePalette.backdropColor[0] * 0.82 +
-        brightD * themePalette.baseColor[0] * 0.12;
-      let green =
-        BASE_BG_COLOR[1] +
-        brightD * themePalette.backdropColor[1] * 0.84 +
-        lineStrength * themePalette.lineColor[1] * 0.12;
-      let blue =
-        BASE_BG_COLOR[2] +
-        coolD * themePalette.backdropColor[2] * 0.92 +
-        lineStrength * themePalette.lineColor[2] * 0.1;
+      let red = baseBgColor[0];
+      let green = baseBgColor[1];
+      let blue = baseBgColor[2];
 
-      if (useGlowColor && renderState.hasCpuGlowAccumulation && colorWeight[ptr] > 1e-6) {
+      if (!residualMode) {
+        red += warmD * themePalette.backdropColor[0] * 0.82 + brightD * themePalette.baseColor[0] * 0.12;
+        green += brightD * themePalette.backdropColor[1] * 0.84;
+        blue += coolD * themePalette.backdropColor[2] * 0.92;
+      }
+
+      green += lineStrength * themePalette.lineColor[1] * 0.12;
+      blue += lineStrength * themePalette.lineColor[2] * 0.1;
+
+      if (!residualMode && useGlowColor && renderState.hasCpuGlowAccumulation && colorWeight[ptr] > 1e-6) {
         const weight = colorWeight[ptr];
         const avgColor: RGBColor = [
           colorAccum[ptr * 3] / weight,
@@ -173,13 +175,14 @@ function compositeLegacyScene(
   const inset = canvas.width * 0.09;
   const drawSize = canvas.width - inset * 2;
   const useAnalyticCircleSingle = state.plateShape === "circle" && state.displayMode === "single";
+  const compositeBaseBg = state.combineMode === "residual" ? [0, 0, 0] as RGBColor : BASE_BG_COLOR;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (!useDirectGpuPresentation) {
-    ctx.fillStyle = toRgba(BASE_BG_COLOR, 1);
+    ctx.fillStyle = toRgba(compositeBaseBg, 1);
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   } else if (state.renderStyle === "glow" && !useAnalyticCircleSingle) {
     ctx.save();
-    ctx.fillStyle = toRgba(BASE_BG_COLOR, 0.94);
+    ctx.fillStyle = toRgba(compositeBaseBg, 0.94);
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.imageSmoothingEnabled = true;
     ctx.filter = `blur(${(0.35 + singleModeBlur * 0.45).toFixed(2)}px)`;
@@ -233,7 +236,7 @@ function compositeLegacyScene(
     const glowContourStart = frameProfileTools.profileSectionStart(frameProfileTools.frameProfile);
     drawGlowContours(smoothedIsolinePath, drawSize, singleAmpGate, glowColor, themePalette);
     frameProfileTools.profileSectionEnd(frameProfileTools.frameProfile, "glowContours", glowContourStart);
-  } else if (!useDirectGpuPresentation) {
+  } else if (!useDirectGpuPresentation && state.combineMode !== "residual") {
     ctx.save();
     ctx.shadowColor = toRgba(themePalette.outerColor, 0.12);
     ctx.shadowBlur = 14;
@@ -255,10 +258,10 @@ function compositeLegacyScene(
     const ringWidth = Math.max(10, canvas.width * 0.01);
     const innerRadius = outerRadius - ringWidth;
     const ringGradient = ctx.createRadialGradient(centerX, centerY, innerRadius, centerX, centerY, outerRadius);
-    ringGradient.addColorStop(0, toRgba(BASE_BG_COLOR, 0));
-    ringGradient.addColorStop(0.35, toRgba(BASE_BG_COLOR, 0.12));
-    ringGradient.addColorStop(0.75, toRgba(BASE_BG_COLOR, 0.56));
-    ringGradient.addColorStop(1, toRgba(BASE_BG_COLOR, 0.98));
+    ringGradient.addColorStop(0, toRgba(compositeBaseBg, 0));
+    ringGradient.addColorStop(0.35, toRgba(compositeBaseBg, 0.12));
+    ringGradient.addColorStop(0.75, toRgba(compositeBaseBg, 0.56));
+    ringGradient.addColorStop(1, toRgba(compositeBaseBg, 0.98));
 
     ctx.save();
     ctx.fillStyle = ringGradient;

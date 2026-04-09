@@ -121,9 +121,11 @@ function buildFrameContext(audioFrame: AudioFrame): FrameContext {
   const haloWeight = isSingleMode
     ? 0.62 - singleFocus * 0.34
     : 0.18;
-  const backgroundWeight = isSingleMode
-    ? 0.03 + (1 - singleFocus) * 0.18
-    : 0.12;
+  const backgroundWeight = state.combineMode === "residual"
+    ? 0
+    : isSingleMode
+      ? 0.03 + (1 - singleFocus) * 0.18
+      : 0.12;
   const singleModeBlur = isSingleMode ? (1 - singleFocus) * 12 : 0;
   const averageGlowColor: RGBColor =
     sceneColorWeight > 1e-6

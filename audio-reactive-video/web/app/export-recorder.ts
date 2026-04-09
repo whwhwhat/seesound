@@ -11,6 +11,7 @@ const EXPORT_WIDTH = 1920;
 const EXPORT_HEIGHT = 1080;
 const EXPORT_STAGE_SIZE = 1080;
 const EXPORT_FPS = 60;
+const EXPORT_AUDIO_BITS_PER_SECOND = 320_000;
 
 type RecorderState = {
   stream: MediaStream | null;
@@ -198,7 +199,7 @@ async function startExportRecording(): Promise<void> {
   const recorder = new MediaRecorder(stream, {
     mimeType: getBestMimeType(),
     videoBitsPerSecond: 16_000_000,
-    audioBitsPerSecond: audioTrack ? 192_000 : undefined,
+    audioBitsPerSecond: audioTrack ? EXPORT_AUDIO_BITS_PER_SECOND : undefined,
   });
 
   recorderState.stream = stream;

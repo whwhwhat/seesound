@@ -103,13 +103,28 @@
             <div class="export-panel">
               <div class="export-panel__copy">
                 <p class="section-title">Export</p>
-                <p id="exportStatus" class="status-pill">Export a clean 1920 x 1080 video with the stage centered.</p>
+                <p class="status-pill">Export a clean 1920 x 1080 video with the stage centered.</p>
               </div>
               <div class="export-panel__actions">
-                <button id="exportToggle" class="audio-capture-toggle" type="button" aria-pressed="false">
-                  Start Recording
+                <button
+                  id="exportToggle"
+                  class="export-switch"
+                  type="button"
+                  role="switch"
+                  aria-checked="false"
+                  aria-label="Enable automatic export recording"
+                >
+                  <span class="export-switch__track" aria-hidden="true">
+                    <span class="export-switch__thumb"></span>
+                  </span>
+                  <span class="export-switch__copy">
+                    <span class="export-switch__label">Auto Record</span>
+                    <span class="export-switch__hint">Start when playback starts, stop when playback ends.</span>
+                  </span>
                 </button>
               </div>
+              <p id="exportState" class="export-panel__state">Idle</p>
+              <p id="exportStatus" class="status-pill">Auto record is available only in File mode after a song has been loaded.</p>
             </div>
           </div>
 

@@ -54,6 +54,7 @@ import {
   isExportRecording,
   stopExportRecording,
   syncExportAvailability,
+  syncExportRecordingLifecycle,
 } from "../export-recorder";
 
 let audioPlayerBound = false;
@@ -502,6 +503,7 @@ function bindAudioPlayer() {
     statusNode.textContent = getRunningStatusText();
     syncAudioUi();
     startAnimationLoop();
+    await syncExportRecordingLifecycle();
   });
 
   audio.addEventListener("pause", () => {
@@ -513,6 +515,7 @@ function bindAudioPlayer() {
     syncAudioUi();
     stopAnimationLoop();
     requestRender();
+    void syncExportRecordingLifecycle();
   });
 
   audio.addEventListener("ended", () => {
@@ -527,6 +530,7 @@ function bindAudioPlayer() {
     syncAudioUi();
     stopAnimationLoop();
     requestRender();
+    void syncExportRecordingLifecycle();
   });
 
   audio.addEventListener("loadedmetadata", syncAudioUi);
@@ -539,6 +543,7 @@ function bindAudioPlayer() {
     currentTrackNode.textContent = getDefaultTrackLabel();
     statusNode.textContent = getIdleStatusText();
     syncAudioUi();
+    void syncExportRecordingLifecycle();
   });
 
   setVolumeOpen(false);

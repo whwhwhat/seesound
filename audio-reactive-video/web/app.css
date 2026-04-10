@@ -563,7 +563,7 @@ output,
 
 .export-panel {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   padding: 14px;
   border: 1px solid rgba(173, 215, 223, 0.12);
   border-radius: 22px;
@@ -578,6 +578,95 @@ output,
 .export-panel__actions {
   display: flex;
   justify-content: flex-start;
+  padding: 2px 0 0;
+  border-top: 1px solid rgba(173, 215, 223, 0.08);
+}
+
+.export-panel__state {
+  margin: 2px 0 0;
+  color: rgba(237, 247, 245, 0.92);
+  font: 0.76rem/1 "IBM Plex Mono", monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.export-switch {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 12px 0 10px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: opacity 140ms ease;
+}
+
+.export-switch:hover {
+  opacity: 0.94;
+}
+
+.export-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.export-switch__track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 44px;
+  height: 26px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  transition: background-color 140ms ease;
+}
+
+.export-switch__thumb {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(237, 247, 245, 0.94);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  transition: transform 180ms ease, background-color 140ms ease;
+}
+
+.export-switch__copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.export-switch__label {
+  color: rgba(237, 247, 245, 0.96);
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.export-switch__hint {
+  color: rgba(155, 178, 184, 0.66);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.export-switch.is-armed .export-switch__track {
+  background: rgba(215, 242, 156, 0.38);
+}
+
+.export-switch.is-live .export-switch__track {
+  background: rgba(130, 237, 216, 0.52);
+}
+
+.export-switch.is-armed .export-switch__thumb,
+.export-switch.is-live .export-switch__thumb {
+  transform: translateX(18px);
 }
 
 .controls-section {

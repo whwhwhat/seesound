@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "check": "npm run shader:check && tsc --noEmit",
+    "convert:webm": "node ./scripts/convert-webm-to-mp4.mjs",
     "dev": "vite",
     "build": "npm run check && vite build",
     "shader:check": "node ./scripts/check-shaders.mjs",

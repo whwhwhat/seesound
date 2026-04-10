@@ -21,6 +21,12 @@ type RecorderState = {
   renderContext: CanvasRenderingContext2D;
   toggleButton: HTMLButtonElement | null;
   statusNode: HTMLElement | null;
+  stateNode: HTMLElement | null;
+  exportAudioElement: HTMLAudioElement | null;
+  exportAudioContext: AudioContext | null;
+  exportAudioSourceNode: MediaElementAudioSourceNode | null;
+  exportAudioDestination: MediaStreamAudioDestinationNode | null;
+  isArmed: boolean;
 };
 
 const exportCanvas = document.createElement("canvas");
@@ -40,6 +46,12 @@ const recorderState: RecorderState = {
   renderContext: exportContext,
   toggleButton: null,
   statusNode: null,
+  stateNode: null,
+  exportAudioElement: null,
+  exportAudioContext: null,
+  exportAudioSourceNode: null,
+  exportAudioDestination: null,
+  isArmed: false,
 };
 
 function hasLoadedFileSource(): boolean {
@@ -52,6 +64,14 @@ function getExportStatusNode(): HTMLElement | null {
   }
   recorderState.statusNode = document.getElementById("exportStatus");
   return recorderState.statusNode;
+}
+
+function getExportStateNode(): HTMLElement | null {
+  if (recorderState.stateNode) {
+    return recorderState.stateNode;
+  }
+  recorderState.stateNode = document.getElementById("exportState");
+  return recorderState.stateNode;
 }
 
 function getExportToggleButton(): HTMLButtonElement | null {
@@ -69,16 +89,23 @@ function setExportStatus(message: string): void {
   }
 }
 
+function setExportStateLabel(message: string): void {
+  const node = getExportStateNode();
+  if (node) {
+    node.textContent = message;
+  }
+}
+
 function updateExportButtonUi(isRecording: boolean): void {
   const button = getExportToggleButton();
   if (!button) {
     return;
   }
   const fileModeReady = hasLoadedFileSource();
-  button.textContent = isRecording ? "Stop Recording" : "Start Recording";
   button.classList.toggle("is-live", isRecording);
-  button.setAttribute("aria-pressed", String(isRecording));
-  button.disabled = !isRecording && !fileModeReady;
+  button.classList.toggle("is-armed", recorderState.isArmed && !isRecording);
+  button.setAttribute("aria-checked", String(isRecording || recorderState.isArmed));
+  button.disabled = !isRecording && !recorderState.isArmed && !fileModeReady;
 }
 
 function getVisibleStageCanvas(): HTMLCanvasElement {
@@ -120,23 +147,59 @@ function getBestMimeType(): string {
   return supported ?? "video/webm";
 }
 
-function getAudioTrack(): MediaStreamTrack | null {
-  if (!hasLoadedFileSource()) {
+async function prepareExportAudioTrack(): Promise<MediaStreamTrack | null> {
+  if (!hasLoadedFileSource() || !audio.src) {
     return null;
   }
-  const capturableAudio = audio as HTMLAudioElement & {
-    captureStream?: () => MediaStream;
-    webkitCaptureStream?: () => MediaStream;
-  };
-  let stream: MediaStream | null = null;
-  if (typeof capturableAudio.captureStream === "function") {
-    stream = capturableAudio.captureStream();
-  } else {
-    if (typeof capturableAudio.webkitCaptureStream === "function") {
-      stream = capturableAudio.webkitCaptureStream();
-    }
+
+  if (recorderState.exportAudioDestination) {
+    return recorderState.exportAudioDestination.stream.getAudioTracks()[0] ?? null;
   }
-  return stream?.getAudioTracks()[0] ?? null;
+
+  const exportAudioElement = document.createElement("audio");
+  exportAudioElement.preload = "auto";
+  exportAudioElement.src = audio.currentSrc || audio.src;
+  exportAudioElement.crossOrigin = audio.crossOrigin;
+  exportAudioElement.currentTime = audio.currentTime;
+  exportAudioElement.playbackRate = audio.playbackRate;
+  exportAudioElement.defaultPlaybackRate = audio.defaultPlaybackRate;
+  exportAudioElement.volume = 1;
+
+  const exportAudioContext = new AudioContext();
+  const exportAudioSourceNode = exportAudioContext.createMediaElementSource(exportAudioElement);
+  const exportAudioDestination = exportAudioContext.createMediaStreamDestination();
+  exportAudioSourceNode.connect(exportAudioDestination);
+
+  recorderState.exportAudioElement = exportAudioElement;
+  recorderState.exportAudioContext = exportAudioContext;
+  recorderState.exportAudioSourceNode = exportAudioSourceNode;
+  recorderState.exportAudioDestination = exportAudioDestination;
+
+  await exportAudioContext.resume();
+  await exportAudioElement.play();
+  return exportAudioDestination.stream.getAudioTracks()[0] ?? null;
+}
+
+async function syncExportAudioPlayback(): Promise<void> {
+  const exportAudioElement = recorderState.exportAudioElement;
+  if (!exportAudioElement) {
+    return;
+  }
+
+  const timeDelta = Math.abs(exportAudioElement.currentTime - audio.currentTime);
+  if (timeDelta > 0.05) {
+    exportAudioElement.currentTime = audio.currentTime;
+  }
+
+  if (audio.paused || audio.ended) {
+    exportAudioElement.pause();
+    return;
+  }
+
+  exportAudioElement.playbackRate = audio.playbackRate;
+  if (exportAudioElement.paused) {
+    await exportAudioElement.play();
+  }
 }
 
 function sanitizeFileStem(value: string): string {
@@ -169,9 +232,24 @@ function cleanupRecorder(): void {
   recorderState.stream?.getTracks().forEach((track) => {
     track.stop();
   });
+  recorderState.exportAudioElement?.pause();
+  recorderState.exportAudioElement?.removeAttribute("src");
+  recorderState.exportAudioElement?.load();
+  recorderState.exportAudioSourceNode?.disconnect();
+  recorderState.exportAudioDestination?.disconnect();
+  void recorderState.exportAudioContext?.close();
   recorderState.stream = null;
   recorderState.recorder = null;
   recorderState.chunks = [];
+  recorderState.exportAudioElement = null;
+  recorderState.exportAudioContext = null;
+  recorderState.exportAudioSourceNode = null;
+  recorderState.exportAudioDestination = null;
+  updateExportButtonUi(false);
+}
+
+function disarmExportRecording(): void {
+  recorderState.isArmed = false;
   updateExportButtonUi(false);
 }
 
@@ -191,7 +269,7 @@ async function startExportRecording(): Promise<void> {
 
   syncExportFrame();
   const stream = exportCanvas.captureStream(EXPORT_FPS);
-  const audioTrack = getAudioTrack();
+  const audioTrack = await prepareExportAudioTrack();
   if (audioTrack) {
     stream.addTrack(audioTrack);
   }
@@ -216,28 +294,24 @@ async function startExportRecording(): Promise<void> {
     const blob = new Blob(recorderState.chunks, { type: recorder.mimeType || "video/webm" });
     cleanupRecorder();
     downloadRecording(blob);
-    setExportStatus("Recording saved as WebM. The stage was exported as a centered 1920 x 1080 scene.");
+    setExportStateLabel("Saved");
+    setExportStatus("Recording saved as WebM. Auto record is now idle and ready for the next playback.");
     statusNode.textContent = "Recording finished and downloaded.";
   };
 
   recorder.onerror = () => {
     cleanupRecorder();
+    setExportStateLabel("Error");
     setExportStatus("Recording failed before export could finish.");
     statusNode.textContent = "Recording failed.";
   };
 
   recorder.start(1000);
+  recorderState.isArmed = false;
   updateExportButtonUi(true);
-  setExportStatus("Recording 1920 x 1080 video with the stage centered and song audio included.");
+  setExportStateLabel("Recording...");
+  setExportStatus("Auto record is active. Exporting 1920 x 1080 video with the stage centered and song audio included.");
   statusNode.textContent = "Recording export video…";
-
-  if (state.activeAudioSource === "file" && audio.paused && !audio.ended) {
-    try {
-      await audio.play();
-    } catch {
-      setExportStatus("Recording started, but playback is still paused. Press play when you are ready.");
-    }
-  }
 }
 
 function stopExportRecording(): void {
@@ -263,26 +337,67 @@ function bindExportRecorder(): void {
       stopExportRecording();
       return;
     }
-    void startExportRecording();
+    if (recorderState.isArmed) {
+      disarmExportRecording();
+      setExportStateLabel("Idle");
+      setExportStatus("Auto record is off.");
+      return;
+    }
+    recorderState.isArmed = true;
+    updateExportButtonUi(false);
+    setExportStateLabel("Armed");
+    setExportStatus("Auto record is armed. Playback will start capture automatically.");
+    statusNode.textContent = "Auto record armed. Press play to begin export.";
+    void syncExportRecordingLifecycle();
   });
 }
 
 function syncExportAvailability(): void {
-  if (isExportRecording()) {
+  if (isExportRecording() || recorderState.isArmed) {
+    updateExportButtonUi(isExportRecording());
     return;
   }
   if (hasLoadedFileSource()) {
-    setExportStatus("Export a clean 1920 x 1080 video with the stage centered.");
+    setExportStateLabel("Idle");
+    setExportStatus("Auto record is ready. Playback will trigger export automatically.");
   } else {
-    setExportStatus("Export is available only in File mode after a song has been loaded.");
+    setExportStateLabel("Unavailable");
+    setExportStatus("Auto record is available only in File mode after a song has been loaded.");
   }
   updateExportButtonUi(false);
+}
+
+async function syncExportRecordingLifecycle(): Promise<void> {
+  if (!hasLoadedFileSource()) {
+    if (isExportRecording()) {
+      stopExportRecording();
+    } else if (recorderState.isArmed) {
+      disarmExportRecording();
+      setExportStateLabel("Unavailable");
+      setExportStatus("Auto record is available only in File mode after a song has been loaded.");
+    }
+    return;
+  }
+
+  const isPlaying = !audio.paused && !audio.ended;
+  if (recorderState.isArmed && isPlaying) {
+    await startExportRecording();
+    return;
+  }
+
+  if (isExportRecording()) {
+    await syncExportAudioPlayback();
+    if (!isPlaying) {
+      stopExportRecording();
+    }
+  }
 }
 
 export {
   bindExportRecorder,
   isExportRecording,
   stopExportRecording,
+  syncExportRecordingLifecycle,
   syncExportAvailability,
   syncExportFrame,
 };

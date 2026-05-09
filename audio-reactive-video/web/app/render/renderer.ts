@@ -50,9 +50,6 @@ import {
 import {
   renderLatticeScene,
 } from "./lattice-webgpu";
-import {
-  syncExportFrame,
-} from "../export-recorder";
 
 const FRAME_LIMIT_TOLERANCE_MS = 1.25;
 
@@ -78,7 +75,6 @@ function renderField() {
     } else {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
-    syncExportFrame();
     finishFrameProfile(frameProfile);
     return;
   }
@@ -97,7 +93,6 @@ function renderField() {
     } else {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
-    syncExportFrame();
     finishFrameProfile(frameProfile);
     return;
   }
@@ -164,7 +159,6 @@ function renderField() {
     });
     clearGpuPresentation();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    syncExportFrame();
     finishFrameProfile(frameProfile);
     return;
   }
@@ -229,7 +223,6 @@ function renderField() {
       profileSectionStart,
     },
   );
-  syncExportFrame();
   finishFrameProfile(frameProfile);
 }
 

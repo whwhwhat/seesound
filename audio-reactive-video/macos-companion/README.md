@@ -6,7 +6,8 @@ macOS menu bar helper for feeding system audio into the web visualizer without b
 
 - Runs as a lightweight menu bar app
 - Captures macOS system output with `ScreenCaptureKit`
-- Exposes analyser frames on `http://127.0.0.1:43821`
+- Exposes control/status endpoints on `http://127.0.0.1:43821`
+- Streams PCM audio to the browser over `ws://127.0.0.1:43822`
 - Lets the web UI use a new `Desktop App` source mode
 
 ## Run It
@@ -27,4 +28,6 @@ Then in the web app:
 
 - Current implementation captures the active macOS display's system audio path through `ScreenCaptureKit`.
 - The bridge is local-only and listens on `127.0.0.1:43821`.
+- PCM streaming uses `127.0.0.1:43822`.
 - This is macOS-only and currently assumes a single-display default capture target.
+- Desktop capture has more latency than file playback because it crosses native capture, local transport, browser ingest, and an AudioWorklet buffer.

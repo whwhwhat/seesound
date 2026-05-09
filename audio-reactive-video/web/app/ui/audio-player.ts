@@ -50,12 +50,6 @@ import {
   startAnimationLoop,
   stopAnimationLoop,
 } from "../render/renderer";
-import {
-  isExportRecording,
-  stopExportRecording,
-  syncExportAvailability,
-  syncExportRecordingLifecycle,
-} from "../export-recorder";
 
 let audioPlayerBound = false;
 let volumeOpen = false;
@@ -174,7 +168,6 @@ function syncAudioUi() {
   }
   updateCaptureButtonUi();
   updateDesktopButtonUi();
-  syncExportAvailability();
 }
 
 function stopDesktopBridgeCapture(options: { remote: boolean }): void {
@@ -503,7 +496,6 @@ function bindAudioPlayer() {
     statusNode.textContent = getRunningStatusText();
     syncAudioUi();
     startAnimationLoop();
-    await syncExportRecordingLifecycle();
   });
 
   audio.addEventListener("pause", () => {
@@ -515,7 +507,6 @@ function bindAudioPlayer() {
     syncAudioUi();
     stopAnimationLoop();
     requestRender();
-    void syncExportRecordingLifecycle();
   });
 
   audio.addEventListener("ended", () => {
@@ -523,14 +514,10 @@ function bindAudioPlayer() {
       return;
     }
     setActiveAudioInput(null);
-    if (isExportRecording()) {
-      stopExportRecording();
-    }
     statusNode.textContent = getEndedStatusText();
     syncAudioUi();
     stopAnimationLoop();
     requestRender();
-    void syncExportRecordingLifecycle();
   });
 
   audio.addEventListener("loadedmetadata", syncAudioUi);
@@ -543,7 +530,6 @@ function bindAudioPlayer() {
     currentTrackNode.textContent = getDefaultTrackLabel();
     statusNode.textContent = getIdleStatusText();
     syncAudioUi();
-    void syncExportRecordingLifecycle();
   });
 
   setVolumeOpen(false);

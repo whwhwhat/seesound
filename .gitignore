@@ -1,0 +1,28 @@
+# macOS
+.DS_Store
+
+# editors
+.idea/
+.vscode/
+
+# logs
+*.log
+
+# env
+.env
+.env.*
+.venv/
+
+# python
+__pycache__/
+*.pyc
+
+# web tooling
+node_modules/
+dist/
+
+# generated assets
+audio-reactive-video/.arv-output/
+
+# swift build
+.build

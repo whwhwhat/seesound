@@ -1,0 +1,19 @@
+{
+  "name": "audio-reactive-video-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "npm run shader:check && tsc --noEmit",
+    "convert:webm": "node ./scripts/convert-webm-to-mp4.mjs",
+    "dev": "vite",
+    "build": "npm run check && vite build",
+    "shader:check": "node ./scripts/check-shaders.mjs",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@shaderfrog/glsl-parser": "^7.0.1",
+    "typescript": "^5.6.3",
+    "vite": "^6.2.0",
+    "wgsl_reflect": "^1.2.3"
+  }
+}
